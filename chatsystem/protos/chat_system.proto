@@ -5,17 +5,26 @@ syntax = "proto3";
 
 package chatsystem;
 
+// import "google/protobuf/empty.proto";
 
 service ChatServer {
     
     rpc GetUser(User) returns (Status) {}
 
+    rpc LogoutUser(User) returns (Status) {}
+
     rpc GetGroup(Group) returns (GroupDetails) {}
+
+    rpc ExitGroup(Group) returns (Status) {}
 
     rpc GetMessages(Group) returns (stream Message) {}
 
     rpc PostMessage(Message) returns (Status) {}
+
+    rpc HealthCheck(BlankMessage) returns (Status) {}
 }
+
+message BlankMessage {}
 
 message Status {
     bool status = 1;

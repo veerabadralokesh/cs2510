@@ -6,7 +6,9 @@ import chat_system_pb2 as chat__system__pb2
 
 
 class ChatServerStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """import "google/protobuf/empty.proto";
+
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -19,10 +21,20 @@ class ChatServerStub(object):
                 request_serializer=chat__system__pb2.User.SerializeToString,
                 response_deserializer=chat__system__pb2.Status.FromString,
                 )
+        self.LogoutUser = channel.unary_unary(
+                '/chatsystem.ChatServer/LogoutUser',
+                request_serializer=chat__system__pb2.User.SerializeToString,
+                response_deserializer=chat__system__pb2.Status.FromString,
+                )
         self.GetGroup = channel.unary_unary(
                 '/chatsystem.ChatServer/GetGroup',
                 request_serializer=chat__system__pb2.Group.SerializeToString,
                 response_deserializer=chat__system__pb2.GroupDetails.FromString,
+                )
+        self.ExitGroup = channel.unary_unary(
+                '/chatsystem.ChatServer/ExitGroup',
+                request_serializer=chat__system__pb2.Group.SerializeToString,
+                response_deserializer=chat__system__pb2.Status.FromString,
                 )
         self.GetMessages = channel.unary_stream(
                 '/chatsystem.ChatServer/GetMessages',
@@ -34,10 +46,17 @@ class ChatServerStub(object):
                 request_serializer=chat__system__pb2.Message.SerializeToString,
                 response_deserializer=chat__system__pb2.Status.FromString,
                 )
+        self.HealthCheck = channel.unary_unary(
+                '/chatsystem.ChatServer/HealthCheck',
+                request_serializer=chat__system__pb2.BlankMessage.SerializeToString,
+                response_deserializer=chat__system__pb2.Status.FromString,
+                )
 
 
 class ChatServerServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """import "google/protobuf/empty.proto";
+
+    """
 
     def GetUser(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -45,7 +64,19 @@ class ChatServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def LogoutUser(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetGroup(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ExitGroup(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -63,6 +94,12 @@ class ChatServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def HealthCheck(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ChatServerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -71,10 +108,20 @@ def add_ChatServerServicer_to_server(servicer, server):
                     request_deserializer=chat__system__pb2.User.FromString,
                     response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
+            'LogoutUser': grpc.unary_unary_rpc_method_handler(
+                    servicer.LogoutUser,
+                    request_deserializer=chat__system__pb2.User.FromString,
+                    response_serializer=chat__system__pb2.Status.SerializeToString,
+            ),
             'GetGroup': grpc.unary_unary_rpc_method_handler(
                     servicer.GetGroup,
                     request_deserializer=chat__system__pb2.Group.FromString,
                     response_serializer=chat__system__pb2.GroupDetails.SerializeToString,
+            ),
+            'ExitGroup': grpc.unary_unary_rpc_method_handler(
+                    servicer.ExitGroup,
+                    request_deserializer=chat__system__pb2.Group.FromString,
+                    response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
             'GetMessages': grpc.unary_stream_rpc_method_handler(
                     servicer.GetMessages,
@@ -86,6 +133,11 @@ def add_ChatServerServicer_to_server(servicer, server):
                     request_deserializer=chat__system__pb2.Message.FromString,
                     response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
+            'HealthCheck': grpc.unary_unary_rpc_method_handler(
+                    servicer.HealthCheck,
+                    request_deserializer=chat__system__pb2.BlankMessage.FromString,
+                    response_serializer=chat__system__pb2.Status.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'chatsystem.ChatServer', rpc_method_handlers)
@@ -94,7 +146,9 @@ def add_ChatServerServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class ChatServer(object):
-    """Missing associated documentation comment in .proto file."""
+    """import "google/protobuf/empty.proto";
+
+    """
 
     @staticmethod
     def GetUser(request,
@@ -114,6 +168,23 @@ class ChatServer(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def LogoutUser(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/LogoutUser',
+            chat__system__pb2.User.SerializeToString,
+            chat__system__pb2.Status.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def GetGroup(request,
             target,
             options=(),
@@ -127,6 +198,23 @@ class ChatServer(object):
         return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/GetGroup',
             chat__system__pb2.Group.SerializeToString,
             chat__system__pb2.GroupDetails.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ExitGroup(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/ExitGroup',
+            chat__system__pb2.Group.SerializeToString,
+            chat__system__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -160,6 +248,23 @@ class ChatServer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/PostMessage',
             chat__system__pb2.Message.SerializeToString,
+            chat__system__pb2.Status.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def HealthCheck(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/HealthCheck',
+            chat__system__pb2.BlankMessage.SerializeToString,
             chat__system__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
