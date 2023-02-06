@@ -1,0 +1,43 @@
+
+
+
+syntax = "proto3";
+
+package chatsystem;
+
+
+service ChatServer {
+    
+    rpc GetUser(User) returns (Status) {}
+
+    rpc GetGroup(Group) returns (stream GroupDetails) {}
+
+    rpc GetMessages(Group) returns (stream Message) {}
+
+    rpc PostMessage(Message) returns (Status) {}
+}
+
+message Status {
+    bool status = 1;
+}
+
+message Group {
+    string group_id = 1;
+}
+
+message GroupDetails {
+    string group_id = 1;
+    repeated string users = 2;
+}
+
+message User {
+    string user_id = 1;
+}
+
+message Message {
+    string group_id = 1;
+    string user_id = 2;
+    uint64 creation_time = 3;
+    string text = 4;
+    string message_id = 5;
+}
