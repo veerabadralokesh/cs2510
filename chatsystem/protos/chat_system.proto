@@ -10,7 +10,7 @@ service ChatServer {
     
     rpc GetUser(User) returns (Status) {}
 
-    rpc GetGroup(Group) returns (stream GroupDetails) {}
+    rpc GetGroup(Group) returns (GroupDetails) {}
 
     rpc GetMessages(Group) returns (stream Message) {}
 
@@ -23,11 +23,13 @@ message Status {
 
 message Group {
     string group_id = 1;
+    string user_id = 2;
 }
 
 message GroupDetails {
     string group_id = 1;
     repeated string users = 2;
+    bool status = 3;
 }
 
 message User {

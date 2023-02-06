@@ -19,7 +19,7 @@ class ChatServerStub(object):
                 request_serializer=chat__system__pb2.User.SerializeToString,
                 response_deserializer=chat__system__pb2.Status.FromString,
                 )
-        self.GetGroup = channel.unary_stream(
+        self.GetGroup = channel.unary_unary(
                 '/chatsystem.ChatServer/GetGroup',
                 request_serializer=chat__system__pb2.Group.SerializeToString,
                 response_deserializer=chat__system__pb2.GroupDetails.FromString,
@@ -71,7 +71,7 @@ def add_ChatServerServicer_to_server(servicer, server):
                     request_deserializer=chat__system__pb2.User.FromString,
                     response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
-            'GetGroup': grpc.unary_stream_rpc_method_handler(
+            'GetGroup': grpc.unary_unary_rpc_method_handler(
                     servicer.GetGroup,
                     request_deserializer=chat__system__pb2.Group.FromString,
                     response_serializer=chat__system__pb2.GroupDetails.SerializeToString,
@@ -124,7 +124,7 @@ class ChatServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/chatsystem.ChatServer/GetGroup',
+        return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/GetGroup',
             chat__system__pb2.Group.SerializeToString,
             chat__system__pb2.GroupDetails.FromString,
             options, channel_credentials,
