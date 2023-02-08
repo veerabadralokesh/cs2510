@@ -22,6 +22,7 @@ STUB = 'stub'
 SERVER_ONLINE = 'server_connection_active'
 SERVER_CONNECTION_STRING = 'server_string'
 
+HEALTH_CHECK_INTERVAL = 60
 DEFAULT_SERVER_CONNECTION_STRING = 'localhost:12000'
 
 SERVER_CONNECTION_CHECK = 0
@@ -31,3 +32,4 @@ SENT_MESSAGE_CHECK = 3
 
 NO_ACTIVE_SERVER = "No active server found, please connect to a server first"
 NO_ACTIVE_USER = "No active user, please login using username"
+NO_ACTIVE_GROUP = "No active group, please join a group"
