@@ -12,7 +12,7 @@ from datetime import datetime
 import json
 import threading
 from threading import Thread
-
+from queue import Queue
 from client import constants as C
 from client.display_manager import display_manager
 
@@ -203,19 +203,39 @@ def build_message(message_text):
     return message
 
 
-def post_message(stub, message_text):
+def post_message(message_text: str, post_message_queue: Queue, post_message_event: threading.Event):
     try:
         check_state(C.SENT_MESSAGE_CHECK)
         message = build_message(message_text)
-        status = stub.PostMessage(message)
-        if status.status is True:
-            display_manager.info("Message sent successfuly")
-        else:
-            display_manager.error(
-                f"Message senidng failed. Response from server: {status.statusMessage}")
-
+        post_message_queue.put(message)
+        post_message_event.set()
     except Exception as ex:
         raise ex
+
+
+def send_messages(post_message_queue, post_message_event):
+    while True:
+        post_message_event.wait()
+        stub = state[C.STUB]
+        while post_message_queue.qsize():
+            message = post_message_queue.get()
+            retry = 3
+            while retry > 0:
+                try:
+                    status = stub.PostMessage(message)
+                    if status.status is True:
+                        display_manager.info("Message sent successfuly")
+                    else:
+                        display_manager.error(
+                            f"Message senidng failed. Response from server: {status.statusMessage}")
+                    retry = 0
+                    break
+                except grpc.RpcError as rpcError:
+                    retry -= 1
+                    if retry == 0:
+                        display_manager.error(
+                            f"Message senidng failed. Error: {rpcError}") 
+        post_message_event.clear()
 
 
 def run():
@@ -224,6 +244,11 @@ def run():
 
     health_check_thread = Thread(target=health_check, daemon=True)
     health_check_thread.start()
+
+    post_message_queue = Queue()
+    post_message_event = threading.Event()
+    send_message_thread = Thread(target=send_messages, args=[post_message_queue, post_message_event], daemon=True)
+    send_message_thread.start()
 
     while True:
         # display_manager.write("hello", "world")
@@ -253,7 +278,7 @@ def run():
                 enter_group_chat(stub, group_id)
             else:
                 message_text = user_input
-                post_message(stub, message_text)
+                post_message(message_text, post_message_queue, post_message_event)
         except grpc.RpcError as rpcError:
             display_manager.error(f"grpc exception: {rpcError}")
         except Exception as e:
