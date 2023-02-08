@@ -94,5 +94,5 @@ class Datastore(DataManager):
                 json.dump(server_data, wf)
 
 
-data_store = Datastore()
+# data_store = Datastore()
 

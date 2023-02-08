@@ -7,7 +7,7 @@ from concurrent import futures
 import chat_system_pb2
 import chat_system_pb2_grpc
 
-from server.storage.data_store import data_store
+from server.storage.data_store import Datastore
 from server.storage.utils import is_valid_message
 
 def get_messages():
@@ -20,8 +20,9 @@ def get_group_details(group_id, user_id):
 
 class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
-    def __init__(self) -> None:
+    def __init__(self, data_store) -> None:
         super().__init__()
+        self.data_store = data_store
         pass
 
     def GetUser(self, request, context):
@@ -66,16 +67,19 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
 
 def serve():
+    data_store = None
     try:
+        data_store = Datastore()
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         chat_system_pb2_grpc.add_ChatServerServicer_to_server(
-            ChatServerServicer(), server
+            ChatServerServicer(data_store), server
         )
         server.add_insecure_port('[::]:12000')
         server.start()
         server.wait_for_termination()
     finally:
-        data_store.save_on_file()
+        if data_store is not None:
+            data_store.save_on_file()
 
 
 if __name__ == '__main__':
