@@ -6,18 +6,51 @@ import uuid
 import grpc
 import chat_system_pb2
 import chat_system_pb2_grpc
-
+from time import sleep
 from google.protobuf.json_format import MessageToJson
 from datetime import datetime
+import json
+import threading
+from threading import Thread
 
 from client import constants as C
 from client.display_manager import display_manager
 
 global state
 
-state = {
 
-}
+# print(dir(dict))
+class ClientState():
+    def __init__(self, initial={}):
+        self._lock = threading.Lock()
+        self._state = initial
+
+    def __setitem__(self, key, value):
+        with self._lock:
+            self._state[key] = value
+
+    def __getitem__(self, key):
+        return self._state[key]
+
+    def __contains__(self, key):
+        print(key, self._state)
+        return (key in self._state)
+
+    def __str__(self) -> str:
+        return self._state.__str__()
+
+    def get(self, key):
+        return self._state.get(key)
+    
+    def get_dict(self):
+        return self._state
+
+
+state = ClientState()
+
+# state['a'] = 'b'
+# with open('/tmp/test.json1', 'w') as wf:
+#     json.dump(state.get_dict(), wf)
 
 
 def check_state(check_point):
@@ -27,22 +60,22 @@ def check_state(check_point):
     if check_point > C.USER_LOGIN_CHECK:
         if state.get(C.ACTIVE_USER_KEY) is None:
             raise Exception(C.NO_ACTIVE_USER)
-    if check_point == C.JOIN_GROUP_CHECK:
-        if state.get(C.ACTIVE_USER_KEY) is None:
-            raise Exception(C.NO_ACTIVE_USER)
+    if check_point > C.JOIN_GROUP_CHECK:
+        if state.get(C.ACTIVE_GROUP_KEY) is None:
+            raise Exception(C.NO_ACTIVE_GROUP)
 
 
 def manage_exits(stub=None, channel=None, user_id=None, group_id=None):
     if channel is not None:
         if state.get(C.ACTIVE_USER_KEY) is not None:
             manage_exits(stub=state.get(C.STUB), user_id=user_id)
+        channel.close()
+        display_manager.info(
+            f"terminated {state[C.SERVER_CONNECTION_STRING]} successfully")
         state[C.ACTIVE_CHANNEL] = None
         state[C.SERVER_ONLINE] = False
         state[C.SERVER_CONNECTION_STRING] = None
         state[C.STUB] = None
-        channel.close()
-        display_manager.info(
-            f"terminated {state[C.SERVER_CONNECTION_STRING]} successfully")
     if user_id is not None and group_id is None:
         if state.get(C.ACTIVE_USER_KEY) is not None and state.get(C.ACTIVE_USER_KEY) == user_id:
             if state.get(C.ACTIVE_GROUP_KEY) is not None:
@@ -59,6 +92,25 @@ def manage_exits(stub=None, channel=None, user_id=None, group_id=None):
             display_manager.info(
                 f"{user_id} successfully exited group {group_id}")
             state[C.ACTIVE_GROUP_KEY] = None
+
+
+def health_check():
+    while True:
+        try:
+            stub = state.get(C.STUB)
+            if stub is not None:
+                server_status = stub.HealthCheck(
+                    chat_system_pb2.BlankMessage())
+                if server_status.status is True:
+                    state[C.SERVER_ONLINE] = True
+                else:
+                    state[C.SERVER_ONLINE] = False
+            else:
+                state[C.SERVER_ONLINE] = False
+        except Exception as ex:
+            state[C.SERVER_ONLINE] = False
+            display_manager.warn('server disconnected')
+        sleep(C.HEALTH_CHECK_INTERVAL)
 
 
 def join_server(server_string):
@@ -161,15 +213,18 @@ def post_message(stub, message_text):
         else:
             display_manager.error(
                 f"Message senidng failed. Response from server: {status.statusMessage}")
+
     except Exception as ex:
         raise ex
-
-    return C.EXIT_CODE
 
 
 def run():
     status = None
     stub = None
+
+    health_check_thread = Thread(target=health_check, daemon=True)
+    health_check_thread.start()
+
     while True:
         # display_manager.write("hello", "world")
         user_input = display_manager.read()
@@ -208,6 +263,9 @@ def run():
 
 if __name__ == "__main__":
 
-    logging.basicConfig()
-    logging.getLogger().setLevel(logging.INFO)
+    # logging.basicConfig()
+    # logging.getLogger().setLevel(logging.INFO)
+    logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                        datefmt='%d-%m-%Y:%H:%M:%S',
+                        level=logging.INFO)
     run()
