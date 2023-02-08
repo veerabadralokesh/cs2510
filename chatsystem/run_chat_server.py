@@ -27,14 +27,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     def GetUser(self, request, context):
         user_id = request.user_id
         logging.info(f"Login request form user: {user_id}")
-        status = chat_system_pb2.Status(status=True)
+        status = chat_system_pb2.Status(status=True, statusMessage="")
 
         return status
     
     def LogoutUser(self, request, context):
         user_id = request.user_id
         logging.info(f"Logout request form user: {user_id}")
-        status = chat_system_pb2.Status(status=True)
+        status = chat_system_pb2.Status(status=True, statusMessage="")
 
         return status
     
@@ -47,7 +47,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     def ExitGroup(self, request, context):
         group_id = request.group_id
         user_id = request.user_id
-        status = chat_system_pb2.Status(status=True)
+        status = chat_system_pb2.Status(status=True, statusMessage="")
         logging.info(f"{user_id} exited from group {group_id}")
         return status
 
@@ -57,11 +57,11 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             yield new_message
     
     def PostMessage(self, request, context):
-        status = chat_system_pb2.Status(status=True)
+        status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
     
     def HealthCheck(self, request, context):
-        status = chat_system_pb2.Status(status=True)
+        status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
 
 

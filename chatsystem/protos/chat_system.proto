@@ -28,6 +28,7 @@ message BlankMessage {}
 
 message Status {
     bool status = 1;
+    string statusMessage = 2;
 }
 
 message Group {
