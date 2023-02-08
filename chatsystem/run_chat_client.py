@@ -9,7 +9,7 @@ import chat_system_pb2_grpc
 from time import sleep
 from google.protobuf.json_format import MessageToJson
 from datetime import datetime
-
+import json
 import threading
 from threading import Thread
 
@@ -21,9 +21,9 @@ global state
 
 # print(dir(dict))
 class ClientState():
-    def __init__(self):
+    def __init__(self, initial={}):
         self._lock = threading.Lock()
-        self._state = {}
+        self._state = initial
 
     def __setitem__(self, key, value):
         with self._lock:
@@ -41,9 +41,16 @@ class ClientState():
 
     def get(self, key):
         return self._state.get(key)
+    
+    def get_dict(self):
+        return self._state
 
 
 state = ClientState()
+
+# state['a'] = 'b'
+# with open('/tmp/test.json1', 'w') as wf:
+#     json.dump(state.get_dict(), wf)
 
 
 def check_state(check_point):

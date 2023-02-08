@@ -7,7 +7,7 @@ from concurrent import futures
 import chat_system_pb2
 import chat_system_pb2_grpc
 
-
+from server.storage.data_store import data_store
 from server.storage.utils import is_valid_message
 
 def get_messages():
@@ -66,13 +66,16 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
 
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    chat_system_pb2_grpc.add_ChatServerServicer_to_server(
-        ChatServerServicer(), server
-    )
-    server.add_insecure_port('[::]:12000')
-    server.start()
-    server.wait_for_termination()
+    try:
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        chat_system_pb2_grpc.add_ChatServerServicer_to_server(
+            ChatServerServicer(), server
+        )
+        server.add_insecure_port('[::]:12000')
+        server.start()
+        server.wait_for_termination()
+    finally:
+        data_store.save_on_file()
 
 
 if __name__ == '__main__':
