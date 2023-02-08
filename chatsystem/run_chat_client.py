@@ -227,14 +227,14 @@ def send_messages(post_message_queue, post_message_event):
                         display_manager.info("Message sent successfuly")
                     else:
                         display_manager.error(
-                            f"Message senidng failed. Response from server: {status.statusMessage}")
+                            f"Message sending failed. Response from server: {status.statusMessage}")
                     retry = 0
                     break
                 except grpc.RpcError as rpcError:
                     retry -= 1
                     if retry == 0:
                         display_manager.error(
-                            f"Message senidng failed. Error: {rpcError}") 
+                            f"Message sending failed. Error: {rpcError}") 
         post_message_event.clear()
 
 
