@@ -39,6 +39,7 @@ class ServerCollection():
 class Datastore(DataManager):
 
     def __init__(self, messages={}, users={}, groups={}) -> None:
+        # messages = {message_object, }
         super().__init__()
         self.messages = ServerCollection(messages)
         self.users = ServerCollection(users)
@@ -51,9 +52,15 @@ class Datastore(DataManager):
         message_id = message['message_id']
         if message_id not in self.messages:
             self.messages[message_id] = message
+            self.groups[message["group_id"]]["message_ids"] = message.message_id
+
+
         return True
 
     def get_message_list(self, message_ids):
+        """
+        helper function for get_messages 
+        """
         message_list = []
         for message_id in message_ids:
             message = self.messages.get(message_id)
@@ -62,13 +69,19 @@ class Datastore(DataManager):
         return message_list
     
     def get_messages(self, group_id, message_count=10):
+        """
+        called when user wants to quits history or newly joins
+        """
         if message_count < 0: return []
         group = self.get_group(group_id)
         message_ids = group.get('message_ids')[-message_count:]
         return self.get_message_list(message_ids)
     
     def get_group(self, group_id):
-        raise NotImplementedError("Class should implement the method")
+        return self.groups.get(group_id, {})
+    
+    def create_group
+    # TODO: complete this shit
     
     def __del__(self):
         self.save_on_file()

@@ -8,7 +8,10 @@ import chat_system_pb2
 import chat_system_pb2_grpc
 
 from server.storage.data_store import Datastore
+from google.protobuf.json_format import MessageToDict
 from server.storage.utils import is_valid_message
+
+data_store = Datastore()
 
 def get_messages():
     return []
@@ -54,11 +57,13 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
     def GetMessages(self, request, context):
         prev_messages = []
-        for new_message in get_messages():
+        for new_message in data_store.get_messages(request.group_id):
             yield new_message
     
     def PostMessage(self, request, context):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
+        message = MessageToDict(request, preserving_proto_field_name=True)
+        data_store.save_message(message)
         return status
     
     def HealthCheck(self, request, context):
@@ -76,6 +81,7 @@ def serve():
         )
         server.add_insecure_port('[::]:12000')
         server.start()
+        print("Server started")
         server.wait_for_termination()
     finally:
         if data_store is not None:

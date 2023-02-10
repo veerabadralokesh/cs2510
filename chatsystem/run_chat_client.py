@@ -112,6 +112,17 @@ def health_check():
             display_manager.warn('server disconnected')
         sleep(C.HEALTH_CHECK_INTERVAL)
 
+def message_check():
+    while True:
+        stub = state.get(C.STUB)
+        if stub is None:
+            state[C.SERVER_ONLINE] = False
+        else:
+            messages = stub.GetMessages(chat_system_pb2.Group(group_id = state.get(C.ACTIVE_GROUP_KEY)))
+            for message in messages:
+                print(f"{messages.user_id}: {message.text}")
+        
+        sleep(C.MESSAGE_CHECK_INTERVAL)
 
 def join_server(server_string):
     if server_string == state.get(C.SERVER_CONNECTION_STRING):
@@ -202,6 +213,9 @@ def build_message(message_text):
 
     return message
 
+def get_message(stub):
+    stub.GetMessages(group_id=state.get(C.ACTIVE_GROUP_KEY))
+    pass
 
 def post_message(message_text: str, post_message_queue: Queue, post_message_event: threading.Event):
     try:
@@ -215,16 +229,18 @@ def post_message(message_text: str, post_message_queue: Queue, post_message_even
 
 def send_messages(post_message_queue, post_message_event):
     while True:
-        post_message_event.wait()
+        post_message_event.wait()  # sleeps till post_message_event.set() is called
         stub = state[C.STUB]
         while post_message_queue.qsize():
-            message = post_message_queue.get()
+            message = post_message_queue[0]
             retry = 3
             while retry > 0:
                 try:
                     status = stub.PostMessage(message)
                     if status.status is True:
                         display_manager.info("Message sent successfuly")
+                        post_message_queue.get()
+
                     else:
                         display_manager.error(
                             f"Message sending failed. Response from server: {status.statusMessage}")
@@ -245,11 +261,16 @@ def run():
     health_check_thread = Thread(target=health_check, daemon=True)
     health_check_thread.start()
 
+    # retry queue that stores users' messages that will get delivered
+    # even if message fails to be sent to server
     post_message_queue = Queue()
     post_message_event = threading.Event()
     send_message_thread = Thread(target=send_messages, args=[post_message_queue, post_message_event], daemon=True)
     send_message_thread.start()
 
+    message_check_thread = Thread(target=message_check, daemon=True)
+    message_check_thread.start()
+    print("Client started")
     while True:
         # display_manager.write("hello", "world")
         user_input = display_manager.read()
@@ -258,24 +279,30 @@ def run():
         else:
             command = user_input
         try:
+            group_id = ''
+            # connect mode : c
             if command in C.CONNECTION_COMMANDS:
                 server_string = user_input[2:].strip()
                 if server_string == '':
                     server_string = C.DEFAULT_SERVER_CONNECTION_STRING
                 stub = join_server(server_string)
+            # exit mode: q 
             elif command in C.EXIT_APP_COMMANDS:
                 manage_exits(channel=state.get(C.ACTIVE_CHANNEL))
                 break
+            # login user mode: u
             elif command in C.LOGIN_COMMANDS:
                 user_id = user_input[2:].strip()
                 if len(user_id) < 1:
                     raise Exception("Invalide user_id")
                 get_user_connection(stub, user_id)
+            # join group mode: j
             elif command in C.JOIN_GROUP_COMMANDS:
                 group_id = user_input[2:].strip()
                 if len(group_id) < 1:
                     raise Exception("Invalide group_id")
                 enter_group_chat(stub, group_id)
+            # typing mode & also implement get messages mode
             else:
                 message_text = user_input
                 post_message(message_text, post_message_queue, post_message_event)
@@ -287,7 +314,7 @@ def run():
 
 
 if __name__ == "__main__":
-
+    
     # logging.basicConfig()
     # logging.getLogger().setLevel(logging.INFO)
     logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
