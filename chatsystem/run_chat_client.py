@@ -7,7 +7,7 @@ import grpc
 import chat_system_pb2
 import chat_system_pb2_grpc
 from time import sleep
-from google.protobuf.json_format import MessageToJson
+from google.protobuf.json_format import MessageToDict
 from datetime import datetime
 import json
 import threading
@@ -136,7 +136,17 @@ def get_messages():
                 state[C.MESSAGE_NUMBER] += 1
                 state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id] =  state[C.MESSAGE_NUMBER]
                 state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.MESSAGE_NUMBER]] = message.message_id
-                print(f"{state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]}. {message.user_id}: {' '.join(message.text)}")
+
+                msg_dict = MessageToDict(message)
+                if msg_dict.get("likes"):
+                    count = sum(list(map(int, msg_dict.get("likes").values())))
+                else:
+                    count = 0
+                if count > 0:
+                    like_text = f'\t\t\t Likes: {count}'
+                else: 
+                    like_text = ''
+                print(f"{state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]}. {message.user_id}: {' '.join(message.text)}{like_text}")
         
         sleep(C.MESSAGE_CHECK_INTERVAL)
 
@@ -194,7 +204,7 @@ def enter_group_chat(stub, group_id):
             return
         group_details = stub.GetGroup(
             chat_system_pb2.Group(group_id=group_id, user_id=user_id))
-        group_data = MessageToJson(group_details)
+        group_data = MessageToDict(group_details)
         if group_details.status is True:
             display_manager.info(f"Successfully joined group {group_id}")
             state[C.ACTIVE_GROUP_KEY] = group_id
@@ -227,22 +237,37 @@ def get_unique_id() -> str:
 def build_message(message_text, message_number, message_type):
     
     if message_type == C.APPEND_TO_CHAT_COMMANDS[0]:
-        message_id = state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number]
-        state[C.MESSAGES][message_id].text = [message_text]
-        message = state[C.MESSAGES][message_id]
-        message.message_type = message_type
+        message = chat_system_pb2.Message(
+            group_id=state.get(C.ACTIVE_GROUP_KEY),
+            user_id=state.get(C.ACTIVE_USER_KEY),
+            creation_time=get_timestamp(),
+            text=[message_text],
+            message_id=state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number],
+            likes={},
+            message_type=message_type
+        )
 
     elif message_type == C.LIKE_COMMANDS[0]:
-        message_id = state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number]
-        state[C.MESSAGES][message_id].likes = {state[C.ACTIVE_USER_KEY]: 1}
-        message = state[C.MESSAGES][message_id]
-        message.message_type = message_type
+        message = chat_system_pb2.Message(
+            group_id=state.get(C.ACTIVE_GROUP_KEY),
+            user_id=state.get(C.ACTIVE_USER_KEY),
+            creation_time=get_timestamp(),
+            text=[],
+            message_id=state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number],
+            likes={state[C.ACTIVE_USER_KEY]: 1},
+            message_type=message_type
+        )
 
     elif message_type == C.UNLIKE_COMMANDS[0]:
-        message_id = state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number]
-        state[C.MESSAGES][message_id].likes = {state[C.ACTIVE_USER_KEY]: 0}
-        message = state[C.MESSAGES][message_id]
-        message.message_type = message_type
+        message = chat_system_pb2.Message(
+            group_id=state.get(C.ACTIVE_GROUP_KEY),
+            user_id=state.get(C.ACTIVE_USER_KEY),
+            creation_time=get_timestamp(),
+            text=[],
+            message_id=state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number],
+            likes={state[C.ACTIVE_USER_KEY]: 0},
+            message_type=message_type
+        )
 
     else:
         message_id=get_unique_id()
@@ -253,10 +278,10 @@ def build_message(message_text, message_number, message_type):
             creation_time=get_timestamp(),
             text=[message_text],
             message_id=message_id,
-            likes={state.get(C.ACTIVE_USER_KEY): 0},
+            likes={},
             message_type=C.NEW
         )
-    state[C.MESSAGES][message_id] = message
+    # state[C.MESSAGES][message_id] = message
 
     return message
 

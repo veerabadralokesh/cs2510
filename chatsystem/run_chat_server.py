@@ -65,30 +65,27 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
     def GetMessages(self, request, context):
         prev_messages = []
-        chat_index = 0
         print("enter get messages")
+        last_msg_idx = -10
         while True:
-            print("message in group", request.group_id, ":", data_store.get_messages(request.group_id))
-            for new_message in data_store.get_messages(request.group_id):
+            # print("message in group", request.group_id, ":", data_store.get_messages(request.group_id))
+            last_msg_idx, new_messages = data_store.get_messages(request.group_id, start_index=last_msg_idx)
+            for new_message in new_messages:
+                # last_msg_idx += 1
+                message_grpc = chat_system_pb2.Message(
+                    group_id=new_message["group_id"],
+                    user_id=new_message["user_id"],
+                    creation_time=new_message["creation_time"],
+                    text=new_message["text"],
+                    message_id=new_message["message_id"],
+                    likes=new_message.get("likes"),
+                    message_type=new_message["message_type"]
+                )
 
-                if len(data_store.get_messages(request.group_id)) > chat_index:
-                    chat_index += 1
-                    message_grpc = chat_system_pb2.Message(
-                        group_id=new_message["group_id"],
-                        user_id=new_message["user_id"],
-                        creation_time=new_message["creation_time"],
-                        text=new_message["text"],
-                        message_id=new_message["message_id"],
-                        likes=new_message.get("likes"),
-                        message_type=new_message["message_type"]
-                    )
-
-                    yield message_grpc
+                yield message_grpc
 
             self.new_message_event.clear()
-            print("check 1")
             self.new_message_event.wait()
-            print("check 2")
 
     
     def PostMessage(self, request, context):

@@ -57,8 +57,10 @@ class Datastore(DataManager):
         message["creation_time"] = int(message["creation_time"])
 
         if message["message_type"] == C.NEW:
-            self.messages[message_id] = message
-            self.groups[message["group_id"]]["message_ids"].append(message_id   )
+            with self._lock:
+                self.messages[message_id] = message
+                message["likes"] = {}
+                self.groups[message["group_id"]]["message_ids"].append(message_id   )
 
         elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
             with self._lock:
@@ -82,7 +84,7 @@ class Datastore(DataManager):
                 message_list.append(message)
         return message_list
     
-    def get_messages(self, group_id, message_count=10):
+    def get_messages(self, group_id, start_index=-10, message_count=10):
         """
         called when user wants to quits history or newly joins
         """
@@ -90,8 +92,12 @@ class Datastore(DataManager):
         group = self.get_group(group_id)
         if group is None:
             return []
-        message_ids = group.get('message_ids')[-message_count:]
-        return self.get_message_list(message_ids)
+
+        with self._lock:
+            all_msg_ids = group.get('message_ids')
+            message_ids = all_msg_ids[start_index:]
+            last_index = len(all_msg_ids)
+        return last_index, self.get_message_list(message_ids)
     
     def get_group(self, group_id):
         return self.groups.get(group_id)
