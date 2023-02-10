@@ -3,7 +3,7 @@
 import logging
 import grpc
 from concurrent import futures
-
+import threading
 import chat_system_pb2
 import chat_system_pb2_grpc
 
@@ -33,6 +33,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     def __init__(self, data_store) -> None:
         super().__init__()
         self.data_store = data_store
+        self.new_message_event = threading.Event()
+
         pass
 
     def GetUser(self, request, context):
@@ -63,13 +65,37 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
     def GetMessages(self, request, context):
         prev_messages = []
-        for new_message in data_store.get_messages(request.group_id):
-            yield new_message
+        chat_index = 0
+        print("enter get messages")
+        while True:
+            print("message in group", request.group_id, ":", data_store.get_messages(request.group_id))
+            for new_message in data_store.get_messages(request.group_id):
+
+                if len(data_store.get_messages(request.group_id)) > chat_index:
+                    chat_index += 1
+                    message_grpc = chat_system_pb2.Message(
+                        group_id=new_message["group_id"],
+                        user_id=new_message["user_id"],
+                        creation_time=new_message["creation_time"],
+                        text=new_message["text"],
+                        message_id=new_message["message_id"],
+                        likes=new_message.get("likes"),
+                        message_type=new_message["message_type"]
+                    )
+
+                    yield message_grpc
+
+            self.new_message_event.clear()
+            print("check 1")
+            self.new_message_event.wait()
+            print("check 2")
+
     
     def PostMessage(self, request, context):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         message = MessageToDict(request, preserving_proto_field_name=True)
         data_store.save_message(message)
+        self.new_message_event.set()
         return status
     
     def HealthCheck(self, request, context):

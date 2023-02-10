@@ -128,15 +128,15 @@ def health_check():
 def get_messages():
     while True:
         stub = state.get(C.STUB)
-        if stub is None:
-            state[C.SERVER_ONLINE] = False
+        if stub is None or state.get(C.ACTIVE_GROUP_KEY) is  None:
+            pass
         else:
             messages = stub.GetMessages(chat_system_pb2.Group(group_id = state.get(C.ACTIVE_GROUP_KEY)))
             for message in messages:
                 state[C.MESSAGE_NUMBER] += 1
                 state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id] =  state[C.MESSAGE_NUMBER]
                 state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.MESSAGE_NUMBER]] = message.message_id
-                print(f"{state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]}. {messages.user_id}: {message.text}")
+                print(f"{state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]}. {message.user_id}: {' '.join(message.text)}")
         
         sleep(C.MESSAGE_CHECK_INTERVAL)
 
@@ -280,7 +280,6 @@ def send_messages(post_message_queue, post_message_event):
             retry = 3
             while retry > 0:
                 try:
-                    print("message", message)
                     status = stub.PostMessage(message)
                     if status.status is True:
                         display_manager.info("Message sent successfuly")

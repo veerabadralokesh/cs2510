@@ -54,10 +54,11 @@ class Datastore(DataManager):
         if not is_valid_message(message):
             raise Exception("Invalid Message")
         message_id = message['message_id']
+        message["creation_time"] = int(message["creation_time"])
 
         if message["message_type"] == C.NEW:
             self.messages[message_id] = message
-            self.groups[message["group_id"]]["message_ids"] = message.message_id
+            self.groups[message["group_id"]]["message_ids"].append(message_id   )
 
         elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
             with self._lock:
@@ -78,7 +79,7 @@ class Datastore(DataManager):
         for message_id in message_ids:
             message = self.messages.get(message_id)
             if message is not None:
-                self.message_list.append(message)
+                message_list.append(message)
         return message_list
     
     def get_messages(self, group_id, message_count=10):
