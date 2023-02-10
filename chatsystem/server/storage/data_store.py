@@ -41,7 +41,7 @@ class Datastore(DataManager):
     def __init__(self, messages={}, users={}, groups={}) -> None:
         # messages = {message_object, }
         super().__init__()
-        self.lock = threading.Lock()
+        self._lock = threading.Lock()
         self.messages = ServerCollection(messages)
         self.users = ServerCollection(users)
         self.groups = ServerCollection(groups)
@@ -60,12 +60,12 @@ class Datastore(DataManager):
             self.groups[message["group_id"]]["message_ids"] = message.message_id
 
         elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
-            with self.lock:
+            with self._lock:
                 original_message = self.messages[message_id]
                 original_message["text"].extend(message["text"])
         else:
             # like / unlike message_type
-            with self.lock:
+            with self._lock:
                 original_message = self.messages[message_id]
                 for key, val in message["likes"].items():
                     original_message["likes"][key] = val
