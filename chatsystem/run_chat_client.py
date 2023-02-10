@@ -65,7 +65,7 @@ def check_state(check_point):
             raise Exception(C.NO_ACTIVE_GROUP)
 
 
-def exit_group(user_id, group_id=state[C.ACTIVE_GROUP_KEY]):
+def exit_group(user_id, group_id):
     stub=state.get(C.STUB)
     stub.ExitGroup(chat_system_pb2.Group(
         group_id=group_id, user_id=user_id))
@@ -115,6 +115,7 @@ def health_check():
                 if server_status.status is True:
                     state[C.SERVER_ONLINE] = True
                 else:
+                    # print("enter", "server_status.status ", server_status.status )
                     state[C.SERVER_ONLINE] = False
             else:
                 state[C.SERVER_ONLINE] = False
@@ -124,7 +125,7 @@ def health_check():
         sleep(C.HEALTH_CHECK_INTERVAL)
 
 
-def message_check():
+def get_messages():
     while True:
         stub = state.get(C.STUB)
         if stub is None:
@@ -132,6 +133,9 @@ def message_check():
         else:
             messages = stub.GetMessages(chat_system_pb2.Group(group_id = state.get(C.ACTIVE_GROUP_KEY)))
             for message in messages:
+                state[C.MESSAGE_NUMBER] += 1
+                state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id] =  state[C.MESSAGE_NUMBER]
+                state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.MESSAGE_NUMBER]] = message.message_id
                 print(f"{state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]}. {messages.user_id}: {message.text}")
         
         sleep(C.MESSAGE_CHECK_INTERVAL)
@@ -241,25 +245,20 @@ def build_message(message_text, message_number, message_type):
         message.message_type = message_type
 
     else:
+        message_id=get_unique_id()
+
         message = chat_system_pb2.Message(
             group_id=state.get(C.ACTIVE_GROUP_KEY),
             user_id=state.get(C.ACTIVE_USER_KEY),
             creation_time=get_timestamp(),
             text=[message_text],
-            message_id=get_unique_id(),
-            likes={}
+            message_id=message_id,
+            likes={state.get(C.ACTIVE_USER_KEY): 0},
+            message_type=C.NEW
         )
     state[C.MESSAGES][message_id] = message
 
     return message
-
-def get_message(stub):
-    messages = stub.GetMessages(group_id=state.get(C.ACTIVE_GROUP_KEY))
-    for message in messages:
-        state[C.MESSAGE_NUMBER] += 1
-        state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id] =  state[C.MESSAGE_NUMBER]
-        state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.MESSAGE_NUMBER]] = message.message_id
-        state[C.MESSAGES][message.message_id] = message
 
 
 def post_message(message_text: str, post_message_queue: Queue, post_message_event: threading.Event, message_number, message_type):
@@ -277,25 +276,27 @@ def send_messages(post_message_queue, post_message_event):
         post_message_event.wait()  # sleeps till post_message_event.set() is called
         stub = state[C.STUB]
         while post_message_queue.qsize():
-            message = post_message_queue[0]
+            message = post_message_queue.queue[0]
             retry = 3
             while retry > 0:
                 try:
+                    print("message", message)
                     status = stub.PostMessage(message)
                     if status.status is True:
                         display_manager.info("Message sent successfuly")
                         post_message_queue.get()
 
                     else:
-                        display_manager.error(
+                        logging.error(
                             f"Message sending failed. Response from server: {status.statusMessage}")
                     retry = 0
                     break
                 except grpc.RpcError as rpcError:
                     retry -= 1
                     if retry == 0:
-                        display_manager.error(
+                        logging.error(
                             f"Message sending failed. Error: {rpcError}") 
+            break
         post_message_event.clear()
 
 
@@ -313,8 +314,8 @@ def run():
     send_message_thread = Thread(target=send_messages, args=[post_message_queue, post_message_event], daemon=True)
     send_message_thread.start()
 
-    message_check_thread = Thread(target=message_check, daemon=True)
-    message_check_thread.start()
+    get_message_thread = Thread(target=get_messages, daemon=True)
+    get_message_thread.start()
     print("Client started")
     while True:
         # display_manager.write("hello", "world")
@@ -323,73 +324,73 @@ def run():
             command = user_input.split(' ')[0].strip()
         else:
             command = user_input
-        try:
-            group_id = ''
-            # connect mode : c
-            if command in C.CONNECTION_COMMANDS:
-                server_string = user_input[2:].strip()
-                if server_string == '':
-                    server_string = C.DEFAULT_SERVER_CONNECTION_STRING
-                stub = join_server(server_string)
-            # exit mode: q 
-            elif command in C.EXIT_APP_COMMANDS:
-                close_connection(channel=state.get(C.ACTIVE_CHANNEL))
-                break
-            # login user mode: u
-            elif command in C.LOGIN_COMMANDS:
-                user_id = user_input[2:].strip()
-                if len(user_id) < 1:
-                    raise Exception("Invalid user_id")
-                get_user_connection(stub, user_id)
-            # join group mode: j
-            elif command in C.JOIN_GROUP_COMMANDS:
-                group_id = user_input[2:].strip()
-                if len(group_id) < 1:
-                    raise Exception("Invalide group_id")
-                enter_group_chat(stub, group_id)
-            
-            # like mode: l
-            elif command in C.LIKE_COMMANDS or command in C.UNLIKE_COMMANDS:
-                splits = user_input.split(" ")
-                message_number = splits[1]
-                if not message_number.isdigit():
-                    raise Exception("Invalid command")
-                message_number = int(message_number)
-                post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
+        # try:
+        group_id = ''
+        # connect mode : c
+        if command in C.CONNECTION_COMMANDS:
+            server_string = user_input[2:].strip()
+            if server_string == '':
+                server_string = C.DEFAULT_SERVER_CONNECTION_STRING
+            stub = join_server(server_string)
+        # exit mode: q 
+        elif command in C.EXIT_APP_COMMANDS:
+            close_connection(channel=state.get(C.ACTIVE_CHANNEL))
+            break
+        # login user mode: u
+        elif command in C.LOGIN_COMMANDS:
+            user_id = user_input[2:].strip()
+            if len(user_id) < 1:
+                raise Exception("Invalid user_id")
+            get_user_connection(stub, user_id)
+        # join group mode: j
+        elif command in C.JOIN_GROUP_COMMANDS:
+            group_id = user_input[2:].strip()
+            if len(group_id) < 1:
+                raise Exception("Invalide group_id")
+            enter_group_chat(stub, group_id)
+        
+        # like mode: l
+        elif command in C.LIKE_COMMANDS or command in C.UNLIKE_COMMANDS:
+            splits = user_input.split(" ")
+            message_number = splits[1]
+            if not message_number.isdigit():
+                raise Exception("Invalid command")
+            message_number = int(message_number)
+            post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
 
-            # append mode: a
-            elif command in C.APPEND_TO_CHAT_COMMANDS:
-                splits = user_input.split(" ")
-                message_number = splits[1]
-                message_text = " ".join(splits[2:])
-                if not message_number.isdigit():
-                    raise Exception("Invalid command")
-                message_number = int(message_number)
-                post_message(message_text, post_message_queue, post_message_event, message_number, message_type=command)
+        # append mode: a
+        elif command in C.APPEND_TO_CHAT_COMMANDS:
+            splits = user_input.split(" ")
+            message_number = splits[1]
+            message_text = " ".join(splits[2:])
+            if not message_number.isdigit():
+                raise Exception("Invalid command")
+            message_number = int(message_number)
+            post_message(message_text, post_message_queue, post_message_event, message_number, message_type=command)
 
-            # like mode: l
-            elif command in C.LIKE_COMMANDS:
-                message_number = user_input.split(" ")[1]
-                if not message_number.isdigit():
-                    raise Exception("Invalid command")
-                message_number = int(message_number)
-                post_message(
-                    message_text=None,
-                    post_message_queue=post_message_queue, 
-                    post_message_event=post_message_event, 
-                    message_number=message_number, 
-                    message_type=command
-                    )
+        # like mode: l
+        elif command in C.LIKE_COMMANDS:
+            message_number = user_input.split(" ")[1]
+            if not message_number.isdigit():
+                raise Exception("Invalid command")
+            message_number = int(message_number)
+            post_message(
+                message_text=None,
+                post_message_queue=post_message_queue, 
+                post_message_event=post_message_event, 
+                message_number=message_number, 
+                message_type=command
+                )
 
-            # typing mode & also implement get messages mode
-            else:
-                message_text = user_input
-                post_message(message_text, post_message_queue, post_message_event, message_type=C.NEW)
-        except grpc.RpcError as rpcError:
-            display_manager.error(f"grpc exception: {rpcError}")
-        except Exception as e:
-            display_manager.error(
-                f"Error: {e}")
+        # typing mode & also implement get messages mode
+        else:
+            message_text = user_input
+            post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
+        # except grpc.RpcError as rpcError:
+        #     logging.error(f"grpc exception: {rpcError}")
+        # except Exception as e:
+        #     logging.error(
+        #         f"Error: {e}")
 
 
 if __name__ == "__main__":

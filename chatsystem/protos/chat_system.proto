@@ -52,6 +52,6 @@ message Message {
     uint64 creation_time = 3;
     repeated string text = 4;
     string message_id = 5;
-    map<string, int> likes = 6;
-    string message_type = 7;
+    map<string, int32> likes = 7;
+    string message_type = 6;
 }

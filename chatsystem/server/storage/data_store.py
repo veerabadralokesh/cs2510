@@ -87,11 +87,13 @@ class Datastore(DataManager):
         """
         if message_count < 0: return []
         group = self.get_group(group_id)
+        if group is None:
+            return []
         message_ids = group.get('message_ids')[-message_count:]
         return self.get_message_list(message_ids)
     
     def get_group(self, group_id):
-        return self.groups.get(group_id, {})
+        return self.groups.get(group_id)
     
     def create_group(self, group_id, users=[]):
         group = {
