@@ -10,6 +10,7 @@ import chat_system_pb2_grpc
 from server.storage.data_store import Datastore
 from google.protobuf.json_format import MessageToDict
 from server.storage.utils import is_valid_message
+import server.constants as C
 
 data_store = Datastore()
 
@@ -17,9 +18,15 @@ def get_messages():
     return []
 
 def get_group_details(group_id, user_id):
-    logging.info(f"{user_id} joined {group_id}")
+
+    if not data_store.get_group(group_id):
+        data_store.create_group(group_id)
+
+    data_store.add_user_to_group(group_id, user_id)
+
     group_details = chat_system_pb2.GroupDetails(group_id=group_id, users=["user1", user_id], status=True)
     return group_details
+
 
 class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
@@ -32,14 +39,12 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         user_id = request.user_id
         logging.info(f"Login request form user: {user_id}")
         status = chat_system_pb2.Status(status=True, statusMessage="")
-
         return status
     
     def LogoutUser(self, request, context):
         user_id = request.user_id
         logging.info(f"Logout request form user: {user_id}")
         status = chat_system_pb2.Status(status=True, statusMessage="")
-
         return status
     
     def GetGroup(self, request, context):
@@ -51,6 +56,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     def ExitGroup(self, request, context):
         group_id = request.group_id
         user_id = request.user_id
+        data_store.remove_user_from_group(group_id, user_id)
         status = chat_system_pb2.Status(status=True, statusMessage="")
         logging.info(f"{user_id} exited from group {group_id}")
         return status

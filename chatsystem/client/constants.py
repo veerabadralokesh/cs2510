@@ -16,6 +16,9 @@ CONNECTION_COMMANDS = ['c']
 LOGIN_COMMANDS = ['u']
 JOIN_GROUP_COMMANDS = ['j']
 EXIT_APP_COMMANDS = ['q']
+APPEND_TO_CHAT_COMMANDS = ['a']
+LIKE_COMMANDS = ['l']
+UNLIKE_COMMANDS = ['r']
 
 STUB = 'stub'
 
@@ -34,3 +37,9 @@ SENT_MESSAGE_CHECK = 3
 NO_ACTIVE_SERVER = "No active server found, please connect to a server first"
 NO_ACTIVE_USER = "No active user, please login using username"
 NO_ACTIVE_GROUP = "No active group, please join a group"
+
+MESSAGE_ID_TO_NUMBER_MAP = "message_id_to_number_map"
+MESSAGE_NUMBER_TO_ID_MAP = "message_number_to_id_map"
+MESSAGE_NUMBER = "message_number"
+MESSAGES = "MESSAGES"
+NEW = "new"

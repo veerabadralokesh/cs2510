@@ -1,4 +1,4 @@
-
+// way to talk from server to client
 
 
 syntax = "proto3";
@@ -50,6 +50,8 @@ message Message {
     string group_id = 1;
     string user_id = 2;
     uint64 creation_time = 3;
-    string text = 4;
+    repeated string text = 4;
     string message_id = 5;
+    map<string, int> likes = 6;
+    string message_type = 7;
 }

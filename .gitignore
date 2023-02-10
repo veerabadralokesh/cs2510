@@ -17,4 +17,5 @@
 chatsystem/Dockerfile.fast
 chatsystem/Dockerfile.base
 chat_env
+.vscode/
 

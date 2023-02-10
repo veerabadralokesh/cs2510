@@ -9,3 +9,11 @@ os.makedirs(DATA_STORE_FILE_DIR_PATH, exist_ok=True)
 
 DATA_STORE_FILE_PATH = os.path.join(DATA_STORE_FILE_DIR_PATH, 'server_datastore.json')
 
+CONNECTION_COMMANDS = ['c']
+LOGIN_COMMANDS = ['u']
+JOIN_GROUP_COMMANDS = ['j']
+EXIT_APP_COMMANDS = ['q']
+APPEND_TO_CHAT_COMMANDS = ['a']
+LIKE_COMMANDS = ['l']
+UNLIKE_COMMANDS = ['r']
+NEW = 'new'

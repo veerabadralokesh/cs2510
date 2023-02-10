@@ -6,7 +6,7 @@ import logging
 import copy
 import server.constants as C
 from server.storage.data_manager import DataManager
-from server.storage.utils import is_valid_message
+from server.storage.utils import is_valid_message, get_timestamp
 
 class ServerCollection():
     def __init__(self, initial={}):
@@ -41,21 +41,34 @@ class Datastore(DataManager):
     def __init__(self, messages={}, users={}, groups={}) -> None:
         # messages = {message_object, }
         super().__init__()
+        self.lock = threading.Lock()
         self.messages = ServerCollection(messages)
         self.users = ServerCollection(users)
         self.groups = ServerCollection(groups)
         self.load_from_file()
 
     def save_message(self, message):
+        """
+        saves new msgs, updates msgs and likes unlikes them
+        """
         if not is_valid_message(message):
             raise Exception("Invalid Message")
         message_id = message['message_id']
-        if message_id not in self.messages:
+
+        if message["message_type"] == C.NEW:
             self.messages[message_id] = message
             self.groups[message["group_id"]]["message_ids"] = message.message_id
 
-
-        return True
+        elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
+            with self.lock:
+                original_message = self.messages[message_id]
+                original_message["text"].extend(message["text"])
+        else:
+            # like / unlike message_type
+            with self.lock:
+                original_message = self.messages[message_id]
+                for key, val in message["likes"].items():
+                    original_message["likes"][key] = val
 
     def get_message_list(self, message_ids):
         """
@@ -80,9 +93,25 @@ class Datastore(DataManager):
     def get_group(self, group_id):
         return self.groups.get(group_id, {})
     
-    def create_group
-    # TODO: complete this shit
+    def create_group(self, group_id, users=[]):
+        group = {
+            'group_id': group_id,
+            'users': users,
+            'message_ids': [],
+            'creation_time': get_timestamp()
+        }
+        self.groups[group_id] = group
+        logging.info(f"Group {group_id} created")
+
+    def add_user_to_group(self, group_id, user_id):
+        self.groups[group_id]['users'].append(user_id)
+        logging.info(f"{user_id} joined {group_id}")
     
+    def remove_user_from_group(self, group_id, user_id):
+        index = self.groups[group_id]['users'].index(user_id)
+        del self.groups[group_id]['users'][index]
+        logging.info(f"{user_id} removed from {group_id}")
+
     def __del__(self):
         self.save_on_file()
     
