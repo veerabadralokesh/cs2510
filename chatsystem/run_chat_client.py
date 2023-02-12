@@ -77,8 +77,9 @@ def exit_group(user_id, group_id):
 def logout_user(user_id):
     stub=state.get(C.STUB)
     if state.get(C.ACTIVE_USER_KEY) == user_id:
-        exit_group(user_id=user_id,
-                    group_id=state[C.ACTIVE_GROUP_KEY])
+        if state.get(C.ACTIVE_GROUP_KEY):
+            exit_group(user_id=user_id,
+                        group_id=state[C.ACTIVE_GROUP_KEY])
 
         stub.LogoutUser(chat_system_pb2.User(user_id=user_id))
         display_manager.info(f"Logout successful for user_id {user_id}")
@@ -423,5 +424,8 @@ if __name__ == "__main__":
     # logging.getLogger().setLevel(logging.INFO)
     logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
                         datefmt='%d-%m-%Y:%H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.INFO,
+                        filename=C.LOG_FILE_PATH,
+                        filemode='a')
+    logging.getLogger().addHandler(logging.StreamHandler())
     run()
