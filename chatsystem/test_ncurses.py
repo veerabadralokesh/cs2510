@@ -43,7 +43,7 @@ def main(stdscr):
             pass
 
     user_name = os.getenv('USER', 'You') + ": "
-    stdscr.addstr(line_number, 0, "")
+    stdscr.addstr(line_number, 0, "")  # to position cursor
     while True:
         c = stdscr.getch()
         if c in allowed_chat_chars:

@@ -6,7 +6,7 @@ import logging
 import copy
 import server.constants as C
 from server.storage.data_manager import DataManager
-from server.storage.utils import is_valid_message, get_timestamp
+from server.storage.utils import is_valid_message, get_timestamp, get_unique_id
 
 class ServerCollection():
     def __init__(self, initial={}):
@@ -56,22 +56,36 @@ class Datastore(DataManager):
         message_id = message['message_id']
         message["creation_time"] = int(message["creation_time"])
 
-        if message["message_type"] == C.NEW:
+        if message["message_type"] in (C.NEW, C.USER_JOIN, C.USER_LEFT):
             with self._lock:
                 self.messages[message_id] = message
                 message["likes"] = {}
-                self.groups[message["group_id"]]["message_ids"].append(message_id   )
+                self.groups[message["group_id"]]["message_ids"].append(message_id)
 
         elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
             with self._lock:
                 original_message = self.messages[message_id]
                 original_message["text"].extend(message["text"])
+        
         else:
             # like / unlike message_type
             with self._lock:
                 original_message = self.messages[message_id]
                 for key, val in message["likes"].items():
                     original_message["likes"][key] = val
+            
+    def save_session_info(self, session_id, user_id, group_id=None, is_active=True):
+        session = {
+            "session_id": session_id, 
+            "user_id": user_id,
+            "group_id": group_id,
+            "timestamp": get_timestamp(),
+            "is_active": is_active
+        }
+        self.users[session_id] = session
+
+    def get_session_info(self, session_id):
+        return self.users.get(session_id)
 
     def get_message_list(self, message_ids):
         """
@@ -115,11 +129,23 @@ class Datastore(DataManager):
     def add_user_to_group(self, group_id, user_id):
         self.groups[group_id]['users'].append(user_id)
         logging.info(f"{user_id} joined {group_id}")
+        self.save_message({"group_id": group_id, 
+        "user_id": user_id,
+        "creation_time": get_timestamp(),
+        "message_id": get_unique_id(),
+        "text":[],
+        "message_type": C.USER_JOIN})
     
     def remove_user_from_group(self, group_id, user_id):
         index = self.groups[group_id]['users'].index(user_id)
         del self.groups[group_id]['users'][index]
         logging.info(f"{user_id} removed from {group_id}")
+        self.save_message({"group_id": group_id, 
+        "user_id": user_id,
+        "creation_time": get_timestamp(),
+        "message_id": get_unique_id(),
+        "text":[],
+        "message_type": C.USER_LEFT})
 
     def __del__(self):
         self.save_on_file()

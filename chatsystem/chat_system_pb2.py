@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x63hat_system.proto\x12\nchatsystem\"\x0e\n\x0c\x42lankMessage\"/\n\x06Status\x12\x0e\n\x06status\x18\x01 \x01(\x08\x12\x15\n\rstatusMessage\x18\x02 \x01(\t\"*\n\x05Group\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\"?\n\x0cGroupDetails\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\r\n\x05users\x18\x02 \x03(\t\x12\x0e\n\x06status\x18\x03 \x01(\x08\"\x17\n\x04User\x12\x0f\n\x07user_id\x18\x01 \x01(\t\"\xd8\x01\n\x07Message\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x15\n\rcreation_time\x18\x03 \x01(\x04\x12\x0c\n\x04text\x18\x04 \x03(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12-\n\x05likes\x18\x07 \x03(\x0b\x32\x1e.chatsystem.Message.LikesEntry\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x1a,\n\nLikesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x32\x9a\x03\n\nChatServer\x12\x31\n\x07GetUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x34\n\nLogoutUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x08GetGroup\x12\x11.chatsystem.Group\x1a\x18.chatsystem.GroupDetails\"\x00\x12\x34\n\tExitGroup\x12\x11.chatsystem.Group\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x0bGetMessages\x12\x11.chatsystem.Group\x1a\x13.chatsystem.Message\"\x00\x30\x01\x12\x38\n\x0bPostMessage\x12\x13.chatsystem.Message\x1a\x12.chatsystem.Status\"\x00\x12=\n\x0bHealthCheck\x12\x18.chatsystem.BlankMessage\x1a\x12.chatsystem.Status\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x63hat_system.proto\x12\nchatsystem\"\x0e\n\x0c\x42lankMessage\"#\n\rActiveSession\x12\x12\n\nsession_id\x18\x01 \x01(\t\"C\n\x06Status\x12\x0e\n\x06status\x18\x01 \x01(\x08\x12\x15\n\rstatusMessage\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\t\"Y\n\x05Group\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x19\n\x11message_start_idx\x18\x03 \x01(\x05\x12\x12\n\nsession_id\x18\x04 \x01(\t\"?\n\x0cGroupDetails\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\r\n\x05users\x18\x02 \x03(\t\x12\x0e\n\x06status\x18\x03 \x01(\x08\"+\n\x04User\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\"\xd8\x01\n\x07Message\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x15\n\rcreation_time\x18\x03 \x01(\x04\x12\x0c\n\x04text\x18\x04 \x03(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12-\n\x05likes\x18\x07 \x03(\x0b\x32\x1e.chatsystem.Message.LikesEntry\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x1a,\n\nLikesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x32\x9b\x03\n\nChatServer\x12\x31\n\x07GetUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x34\n\nLogoutUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x08GetGroup\x12\x11.chatsystem.Group\x1a\x18.chatsystem.GroupDetails\"\x00\x12\x34\n\tExitGroup\x12\x11.chatsystem.Group\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x0bGetMessages\x12\x11.chatsystem.Group\x1a\x13.chatsystem.Message\"\x00\x30\x01\x12\x38\n\x0bPostMessage\x12\x13.chatsystem.Message\x1a\x12.chatsystem.Status\"\x00\x12>\n\x0bHealthCheck\x12\x19.chatsystem.ActiveSession\x1a\x12.chatsystem.Status\"\x00\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'chat_system_pb2', globals())
@@ -24,18 +24,20 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _MESSAGE_LIKESENTRY._serialized_options = b'8\001'
   _BLANKMESSAGE._serialized_start=33
   _BLANKMESSAGE._serialized_end=47
-  _STATUS._serialized_start=49
-  _STATUS._serialized_end=96
-  _GROUP._serialized_start=98
-  _GROUP._serialized_end=140
-  _GROUPDETAILS._serialized_start=142
-  _GROUPDETAILS._serialized_end=205
-  _USER._serialized_start=207
-  _USER._serialized_end=230
-  _MESSAGE._serialized_start=233
-  _MESSAGE._serialized_end=449
-  _MESSAGE_LIKESENTRY._serialized_start=405
-  _MESSAGE_LIKESENTRY._serialized_end=449
-  _CHATSERVER._serialized_start=452
-  _CHATSERVER._serialized_end=862
+  _ACTIVESESSION._serialized_start=49
+  _ACTIVESESSION._serialized_end=84
+  _STATUS._serialized_start=86
+  _STATUS._serialized_end=153
+  _GROUP._serialized_start=155
+  _GROUP._serialized_end=244
+  _GROUPDETAILS._serialized_start=246
+  _GROUPDETAILS._serialized_end=309
+  _USER._serialized_start=311
+  _USER._serialized_end=354
+  _MESSAGE._serialized_start=357
+  _MESSAGE._serialized_end=573
+  _MESSAGE_LIKESENTRY._serialized_start=529
+  _MESSAGE_LIKESENTRY._serialized_end=573
+  _CHATSERVER._serialized_start=576
+  _CHATSERVER._serialized_end=987
 # @@protoc_insertion_point(module_scope)

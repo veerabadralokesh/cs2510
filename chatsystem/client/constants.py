@@ -1,4 +1,4 @@
-
+SESSION_ID = 'SESSION_ID'
 
 RECONNECT = 'RECONNECT'
 
@@ -9,6 +9,7 @@ SWITCH_GROUP = 'SWITCH_GROUP'
 ACTIVE_USER_KEY = 'active_user_id'
 ACTIVE_GROUP_KEY = 'active_group_id'
 ACTIVE_CHANNEL = 'channel'
+MESSAGE_START_IDX = 'MESSAGE_START_IDX'
 
 GROUP_DATA = 'group_data'
 
@@ -19,6 +20,7 @@ EXIT_APP_COMMANDS = ['q']
 APPEND_TO_CHAT_COMMANDS = ['a']
 LIKE_COMMANDS = ['l']
 UNLIKE_COMMANDS = ['r']
+PRINT_HISTORY_COMMANDS = ['p']
 
 STUB = 'stub'
 
@@ -43,3 +45,5 @@ MESSAGE_NUMBER_TO_ID_MAP = "message_number_to_id_map"
 MESSAGE_NUMBER = "message_number"
 MESSAGES = "MESSAGES"
 NEW = "new"
+USER_JOIN = 'joined'
+USER_LEFT = 'left'

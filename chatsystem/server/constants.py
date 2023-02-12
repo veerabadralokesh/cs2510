@@ -17,3 +17,5 @@ APPEND_TO_CHAT_COMMANDS = ['a']
 LIKE_COMMANDS = ['l']
 UNLIKE_COMMANDS = ['r']
 NEW = 'new'
+USER_JOIN = 'joined'
+USER_LEFT = 'left'

@@ -21,19 +21,26 @@ service ChatServer {
 
     rpc PostMessage(Message) returns (Status) {}
 
-    rpc HealthCheck(BlankMessage) returns (Status) {}
+    rpc HealthCheck(ActiveSession) returns (Status) {}
 }
 
 message BlankMessage {}
 
+message ActiveSession {
+    string session_id = 1;
+}
+
 message Status {
     bool status = 1;
     string statusMessage = 2;
+    string session_id = 3;
 }
 
 message Group {
     string group_id = 1;
     string user_id = 2;
+    int32 message_start_idx = 3;
+    string session_id = 4;
 }
 
 message GroupDetails {
@@ -44,6 +51,7 @@ message GroupDetails {
 
 message User {
     string user_id = 1;
+    string session_id = 2;
 }
 
 message Message {
