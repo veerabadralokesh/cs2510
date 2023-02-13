@@ -19,3 +19,5 @@ UNLIKE_COMMANDS = ['r']
 NEW = 'new'
 USER_JOIN = 'joined'
 USER_LEFT = 'left'
+
+MESSAGE_UPDATE_INTERVAL = 50

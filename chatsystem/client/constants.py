@@ -47,3 +47,5 @@ MESSAGES = "MESSAGES"
 NEW = "new"
 USER_JOIN = 'joined'
 USER_LEFT = 'left'
+
+INPUT_PROMPT = "Type a message: "

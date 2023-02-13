@@ -1,6 +1,7 @@
 
 from __future__ import print_function
 
+import curses
 import logging
 import uuid
 import grpc
@@ -14,10 +15,16 @@ import threading
 from threading import Thread
 from queue import Queue
 from client import constants as C
-from client.display_manager import display_manager
+from client.display_manager_ncurses import DisplayManagerCurses
 
 global state
 
+global display_manager
+stdscr = curses.initscr()
+curses.noecho()
+curses.cbreak()
+stdscr.keypad(True)
+display_manager = DisplayManagerCurses(stdscr)
 
 # display_manager.write(dir(dict))
 class ClientState():
@@ -70,6 +77,7 @@ def exit_group(user_id, group_id):
     display_manager.info(
         f"{user_id} successfully exited group {group_id}")
     state[C.ACTIVE_GROUP_KEY] = None
+    display_manager.clear()
 
 
 def logout_user(user_id):
@@ -116,7 +124,6 @@ def health_check():
                 if server_status.status is True:
                     state[C.SERVER_ONLINE] = True
                 else:
-                    # display_manager.write("enter", "server_status.status ", server_status.status )
                     state[C.SERVER_ONLINE] = False
             else:
                 state[C.SERVER_ONLINE] = False
@@ -142,7 +149,6 @@ def get_messages(change_group_event):
         message_start_idx = state.get(C.MESSAGE_START_IDX)
         user_id = state.get(C.ACTIVE_USER_KEY)
         messages = stub.GetMessages(chat_system_pb2.Group(group_id=group_id, user_id=user_id, message_start_idx=message_start_idx, session_id=state[C.SESSION_ID]))
-        # display_manager.write("beginning of new group")
         cancel_messages_thread = Thread(target=cancel_rpc, args=[change_group_event, messages], daemon=True)
         cancel_messages_thread.start()
         try:
@@ -176,6 +182,7 @@ def get_messages(change_group_event):
 
 
 def join_server(server_string):
+
     if server_string == state.get(C.SERVER_CONNECTION_STRING):
         display_manager.info(f'Already connected to server {server_string}')
         return state.get(C.STUB)
@@ -233,8 +240,7 @@ def enter_group_chat(stub, group_id, change_group_event):
         group_data = MessageToDict(group_details)
         if group_details.status is True:
             display_manager.info(f"Successfully joined group {group_id}")
-            display_manager.write(f"Group: {group_id}")
-            display_manager.write(f"Participants: {', '.join(set(group_data['users']))}")
+            display_manager.write_header(f"Group: {group_id}", f"Participants: {', '.join(set(group_data['users']))}")
             state[C.GROUP_DATA] = group_data
             state[C.MESSAGE_ID_TO_NUMBER_MAP] = {}
             state[C.MESSAGE_NUMBER] = 0
@@ -310,8 +316,6 @@ def build_message(message_text, message_number, message_type):
             likes={},
             message_type=C.NEW
         )
-    # state[C.MESSAGES][message_id] = message
-
     return message
 
 
@@ -354,6 +358,7 @@ def send_messages(post_message_queue, post_message_event):
 
 
 def run():
+    
     status = None
     stub = None
 
@@ -378,71 +383,71 @@ def run():
             command = user_input.split(' ')[0].strip()
         else:
             command = user_input
-        try:
-            group_id = ''
-            # connect mode : c
-            if command in C.CONNECTION_COMMANDS:
-                server_string = user_input[2:].strip()
-                if server_string == '':
-                    server_string = C.DEFAULT_SERVER_CONNECTION_STRING
-                stub = join_server(server_string)
+        # try:
+        group_id = ''
+        # connect mode : c
+        if command in C.CONNECTION_COMMANDS:
+            server_string = user_input[2:].strip()
+            if server_string == '':
+                server_string = C.DEFAULT_SERVER_CONNECTION_STRING
+            stub = join_server(server_string)
 
-            # exit mode: q 
-            elif command in C.EXIT_APP_COMMANDS:
-                close_connection(channel=state.get(C.ACTIVE_CHANNEL))
-                break
+        # exit mode: q 
+        elif command in C.EXIT_APP_COMMANDS:
+            close_connection(channel=state.get(C.ACTIVE_CHANNEL))
+            break
 
-            # login user mode: u
-            elif command in C.LOGIN_COMMANDS:
-                user_id = user_input[2:].strip()
-                if len(user_id) < 1:
-                    raise Exception("Invalid user_id")
-                get_user_connection(stub, user_id)
+        # login user mode: u
+        elif command in C.LOGIN_COMMANDS:
+            user_id = user_input[2:].strip()
+            if len(user_id) < 1:
+                raise Exception("Invalid user_id")
+            get_user_connection(stub, user_id)
 
-            # join group mode: j
-            elif command in C.JOIN_GROUP_COMMANDS:
-                group_id = user_input[2:].strip()
-                if len(group_id) < 1:
-                    raise Exception("Invalid group_id")
-                enter_group_chat(stub, group_id, change_group_event)
+        # join group mode: j
+        elif command in C.JOIN_GROUP_COMMANDS:
+            group_id = user_input[2:].strip()
+            if len(group_id) < 1:
+                raise Exception("Invalid group_id")
+            enter_group_chat(stub, group_id, change_group_event)
 
-            # join group mode: p
-            elif command in C.PRINT_HISTORY_COMMANDS:
-                state[C.MESSAGE_START_IDX] = 0
-                state[C.MESSAGE_ID_TO_NUMBER_MAP] = {}
-                state[C.MESSAGE_NUMBER] = 0
-                state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
-                state[C.MESSAGES] = {}
-                change_group_event.set()
-            
-            # like mode: l
-            elif command in C.LIKE_COMMANDS or command in C.UNLIKE_COMMANDS:
-                splits = user_input.split(" ")
-                message_number = splits[1]
-                if not message_number.isdigit():
-                    raise Exception("Invalid command")
-                message_number = int(message_number)
-                post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
+        # join group mode: p
+        elif command in C.PRINT_HISTORY_COMMANDS:
+            state[C.MESSAGE_START_IDX] = 0
+            state[C.MESSAGE_ID_TO_NUMBER_MAP] = {}
+            state[C.MESSAGE_NUMBER] = 0
+            state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
+            state[C.MESSAGES] = {}
+            change_group_event.set()
+        
+        # like mode: l
+        elif command in C.LIKE_COMMANDS or command in C.UNLIKE_COMMANDS:
+            splits = user_input.split(" ")
+            message_number = splits[1]
+            if not message_number.isdigit():
+                raise Exception("Invalid command")
+            message_number = int(message_number)
+            post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
 
-            # append mode: a
-            elif command in C.APPEND_TO_CHAT_COMMANDS:
-                splits = user_input.split(" ")
-                message_number = splits[1]
-                message_text = " ".join(splits[2:])
-                if not message_number.isdigit():
-                    raise Exception("Invalid command")
-                message_number = int(message_number)
-                post_message(message_text, post_message_queue, post_message_event, message_number, message_type=command)
+        # append mode: a
+        elif command in C.APPEND_TO_CHAT_COMMANDS:
+            splits = user_input.split(" ")
+            message_number = splits[1]
+            message_text = " ".join(splits[2:])
+            if not message_number.isdigit():
+                raise Exception("Invalid command")
+            message_number = int(message_number)
+            post_message(message_text, post_message_queue, post_message_event, message_number, message_type=command)
 
-            # typing mode & also implement get messages mode
-            else:
-                message_text = user_input
-                post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
-        except grpc.RpcError as rpcError:
-            logging.error(f"grpc exception: {rpcError}")
-        except Exception as e:
-            logging.error(
-                f"Error: {e}")
+        # typing mode & also implement get messages mode
+        else:
+            message_text = user_input
+            post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
+        # except grpc.RpcError as rpcError:
+        #     logging.error(f"grpc exception: {rpcError}")
+        # except Exception as e:
+        #     logging.error(
+        #         f"Error: {e}")
 
 
 if __name__ == "__main__":
@@ -452,4 +457,10 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
                         datefmt='%d-%m-%Y:%H:%M:%S',
                         level=logging.INFO)
-    run()
+    try:
+        run()
+    finally:
+        curses.nocbreak()
+        stdscr.keypad(False)
+        curses.echo()
+        curses.endwin()

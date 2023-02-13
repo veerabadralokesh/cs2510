@@ -54,25 +54,30 @@ class Datastore(DataManager):
         if not is_valid_message(message):
             raise Exception("Invalid Message")
         message_id = message['message_id']
+        group_id = message["group_id"]
         message["creation_time"] = int(message["creation_time"])
 
         if message["message_type"] in (C.NEW, C.USER_JOIN, C.USER_LEFT):
             with self._lock:
                 self.messages[message_id] = message
                 message["likes"] = {}
-                self.groups[message["group_id"]]["message_ids"].append(message_id)
+                self.groups[group_id]["message_ids"].append(message_id)
 
         elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
             with self._lock:
                 original_message = self.messages[message_id]
                 original_message["text"].extend(message["text"])
+                self.groups[group_id]["updated_ids"].append(message_id)
         
         else:
             # like / unlike message_type
             with self._lock:
                 original_message = self.messages[message_id]
                 for key, val in message["likes"].items():
+                    if original_message["user_id"] == key:
+                        return
                     original_message["likes"][key] = val
+                self.groups[group_id]["updated_ids"].append(message_id)
             
     def save_session_info(self, session_id, user_id, group_id=None, is_active=True):
         session = {
@@ -98,11 +103,10 @@ class Datastore(DataManager):
                 message_list.append(message)
         return message_list
     
-    def get_messages(self, group_id, start_index=-10, message_count=10):
+    def get_messages(self, group_id, start_index=-10, updated_idx=None):
         """
         called when user wants to quits history or newly joins
         """
-        if message_count < 0: return []
         group = self.get_group(group_id)
         if group is None:
             return []
@@ -111,7 +115,13 @@ class Datastore(DataManager):
             all_msg_ids = group.get('message_ids')
             message_ids = all_msg_ids[start_index:]
             last_index = len(all_msg_ids)
-        return last_index, self.get_message_list(message_ids)
+            updated_ids = None
+            if updated_idx is not None:
+                updated_ids = group.get('updated_ids')[updated_idx:]
+                message_ids.extend(updated_ids)
+            updated_idx = len(group.get('updated_ids'))
+
+        return last_index, self.get_message_list(message_ids), updated_idx
     
     def get_group(self, group_id):
         return self.groups.get(group_id)
@@ -121,7 +131,8 @@ class Datastore(DataManager):
             'group_id': group_id,
             'users': users,
             'message_ids': [],
-            'creation_time': get_timestamp()
+            'creation_time': get_timestamp(),
+            'updated_ids': []
         }
         self.groups[group_id] = group
         logging.info(f"Group {group_id} created")

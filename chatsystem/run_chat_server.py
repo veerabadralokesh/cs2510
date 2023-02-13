@@ -1,16 +1,16 @@
 
 
 import logging
-import grpc
-from concurrent import futures
 import threading
+from concurrent import futures
+
 import chat_system_pb2
 import chat_system_pb2_grpc
-
-from server.storage.data_store import Datastore
-from google.protobuf.json_format import MessageToDict
-from server.storage.utils import get_unique_id
+import grpc
 import server.constants as C
+from google.protobuf.json_format import MessageToDict
+from server.storage.data_store import Datastore
+from server.storage.utils import get_unique_id
 
 data_store = Datastore()
 
@@ -75,6 +75,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         prev_messages = []
         # print("enter get messages")
         last_msg_idx = request.message_start_idx
+        updated_idx = None
+
         while True:
             if not context.is_active():
                 session_info = data_store.get_session_info(request.session_id)
@@ -84,9 +86,10 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                     self.new_message_event.set()
                 break
             # print("message in group", request.group_id, ":", data_store.get_messages(request.group_id))
-            last_msg_idx, new_messages = data_store.get_messages(request.group_id, start_index=last_msg_idx)
+            last_msg_idx, new_messages, updated_idx = data_store.get_messages(request.group_id, start_index=last_msg_idx, updated_idx=updated_idx)
+            print("updated_idx",updated_idx)
             for new_message in new_messages:
-                # last_msg_idx += 1
+                
                 message_grpc = chat_system_pb2.Message(
                     group_id=new_message["group_id"],
                     user_id=new_message["user_id"],
