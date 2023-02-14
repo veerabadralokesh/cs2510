@@ -76,6 +76,7 @@ def exit_group(user_id, group_id):
         group_id=group_id, user_id=user_id))
     display_manager.info(
         f"{user_id} successfully exited group {group_id}")
+    display_manager.write_header(group_name="",participants="")
     state[C.ACTIVE_GROUP_KEY] = None
     display_manager.clear()
 
@@ -138,6 +139,22 @@ def cancel_rpc(event, grpc_context):
     event.clear()
     pass
 
+def update_participants(message):
+    if message.group_id == state.get(C.ACTIVE_GROUP_KEY):
+        group_data = state.get(C.GROUP_DATA)
+        if group_data is None: return
+        participants = group_data['users']
+        # print("check 1", participants)
+        if message.message_type == C.USER_JOIN:
+            if message.user_id not in participants:
+                participants.append(message.user_id)
+        elif message.message_type == C.USER_LEFT:
+            index = participants.index(message.user_id)
+            del participants[index]
+        # print("check 2", participants)
+        display_manager.write_header(group_name=f"Group: {state.get(C.ACTIVE_GROUP_KEY)}",
+                    participants=f"Participants: {', '.join(set(participants))}")
+
 def get_messages(change_group_event):
     while True:
         stub = state.get(C.STUB)
@@ -153,14 +170,23 @@ def get_messages(change_group_event):
         cancel_messages_thread.start()
         try:
             for message in messages:
-                if message.message_type in (C.USER_JOIN, C.USER_LEFT):
-                    display_manager.write(f"{datetime.fromtimestamp(int(message.creation_time)/10**6)}: {message.user_id} {message.message_type} {message.group_id}.")
-                    continue
-                
                 if message.message_id not in state[C.MESSAGE_ID_TO_NUMBER_MAP]:
                     state[C.MESSAGE_NUMBER] += 1
+                    # this is to look up display line number of message id
                     state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id] =  state[C.MESSAGE_NUMBER]
-                    state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.MESSAGE_NUMBER]] = message.message_id
+
+                msg_indx = state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]
+
+                if message.message_type in (C.USER_JOIN, C.USER_LEFT):
+                    display_manager.write(msg_indx, f"{datetime.fromtimestamp(int(message.creation_time)/10**6)}: {message.user_id} {message.message_type} {message.group_id}.")
+                    update_participants(message)
+                    continue
+                else:
+                    if message.message_id not in state[C.TEXT_ID_TO_NUMBER_MAP]:
+                        state[C.TEXT_MSG_IDX] += 1
+                        # this map is to look up text message id
+                        state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.TEXT_MSG_IDX]] = message.message_id
+                        state[C.TEXT_ID_TO_NUMBER_MAP][message.message_id] = state[C.TEXT_MSG_IDX]
 
                 msg_dict = MessageToDict(message)
                 if msg_dict.get("likes"):
@@ -172,11 +198,12 @@ def get_messages(change_group_event):
                 else: 
                     like_text = ''
                 #  if message_type : 
-                display_manager.write(f"{state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]}. {message.user_id}: {' '.join(message.text)}{like_text}")
+                text_idx = state[C.TEXT_ID_TO_NUMBER_MAP][message.message_id]
+                display_manager.write(msg_indx, f"{text_idx}. {message.user_id}: {' '.join(message.text)}{like_text}")
         except grpc.RpcError as rpc_error:
             display_manager.debug(rpc_error)
         except Exception as e:
-            display_manager.write(e)
+            display_manager.error(e)
     
         sleep(C.MESSAGE_CHECK_INTERVAL)
 
@@ -207,7 +234,9 @@ def get_user_connection(stub, user_id):
         check_state(C.USER_LOGIN_CHECK)
         if state.get(C.ACTIVE_USER_KEY) is not None:
             if state.get(C.ACTIVE_USER_KEY) != user_id:
-                logout_user(stub, user_id=state[C.ACTIVE_USER_KEY])
+                print(state[C.ACTIVE_USER_KEY])
+                logout_user(user_id=state[C.ACTIVE_USER_KEY])
+                display_manager.set_user(user_id=C.INPUT_PROMPT)
             else:
                 display_manager.info(f"User {user_id} already logged in")
                 return
@@ -215,6 +244,7 @@ def get_user_connection(stub, user_id):
         state[C.SESSION_ID] = status.session_id
         if status.status is True:
             display_manager.info(f"Login successful with user_id {user_id}")
+            display_manager.set_user(user_id)
             state[C.ACTIVE_USER_KEY] = user_id
         else:
             raise Exception("Login not successful")
@@ -243,7 +273,9 @@ def enter_group_chat(stub, group_id, change_group_event):
             display_manager.write_header(f"Group: {group_id}", f"Participants: {', '.join(set(group_data['users']))}")
             state[C.GROUP_DATA] = group_data
             state[C.MESSAGE_ID_TO_NUMBER_MAP] = {}
+            state[C.TEXT_ID_TO_NUMBER_MAP] = {}
             state[C.MESSAGE_NUMBER] = 0
+            state[C.TEXT_MSG_IDX] = 0
             state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
             state[C.MESSAGES] = {}
             state[C.MESSAGE_START_IDX] = -10
@@ -415,7 +447,9 @@ def run():
         elif command in C.PRINT_HISTORY_COMMANDS:
             state[C.MESSAGE_START_IDX] = 0
             state[C.MESSAGE_ID_TO_NUMBER_MAP] = {}
+            state[C.TEXT_ID_TO_NUMBER_MAP] = {}
             state[C.MESSAGE_NUMBER] = 0
+            state[C.TEXT_MSG_IDX] = 0
             state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
             state[C.MESSAGES] = {}
             change_group_event.set()

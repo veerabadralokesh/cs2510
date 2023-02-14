@@ -40,7 +40,9 @@ NO_ACTIVE_SERVER = "No active server found, please connect to a server first"
 NO_ACTIVE_USER = "No active user, please login using username"
 NO_ACTIVE_GROUP = "No active group, please join a group"
 
+TEXT_MSG_IDX = 'TEXT_MSG_IDX'
 MESSAGE_ID_TO_NUMBER_MAP = "message_id_to_number_map"
+TEXT_ID_TO_NUMBER_MAP = "TEXT_ID_TO_NUMBER_MAP"
 MESSAGE_NUMBER_TO_ID_MAP = "message_number_to_id_map"
 MESSAGE_NUMBER = "message_number"
 MESSAGES = "MESSAGES"
@@ -48,4 +50,4 @@ NEW = "new"
 USER_JOIN = 'joined'
 USER_LEFT = 'left'
 
-INPUT_PROMPT = "Type a message: "
+INPUT_PROMPT = "Enter command"

@@ -20,10 +20,10 @@ def get_messages():
 def get_group_details(group_id: str, user_id: str) -> chat_system_pb2.GroupDetails:
 
     if not data_store.get_group(group_id):
+        print("calling create_group", group_id)
         data_store.create_group(group_id)
 
     data_store.add_user_to_group(group_id, user_id)
-
     group_details = chat_system_pb2.GroupDetails(group_id=group_id, users=data_store.get_group(group_id)["users"], status=True)
     return group_details
 

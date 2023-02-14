@@ -200,7 +200,7 @@ def get_user_connection(stub, user_id):
         check_state(C.USER_LOGIN_CHECK)
         if state.get(C.ACTIVE_USER_KEY) is not None:
             if state.get(C.ACTIVE_USER_KEY) != user_id:
-                logout_user(stub, user_id=state[C.ACTIVE_USER_KEY])
+                logout_user(user_id=state[C.ACTIVE_USER_KEY])
             else:
                 display_manager.info(f"User {user_id} already logged in")
                 return

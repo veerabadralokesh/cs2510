@@ -126,10 +126,10 @@ class Datastore(DataManager):
     def get_group(self, group_id):
         return self.groups.get(group_id)
     
-    def create_group(self, group_id, users=[]):
+    def create_group(self, group_id):
         group = {
             'group_id': group_id,
-            'users': users,
+            'users': [],
             'message_ids': [],
             'creation_time': get_timestamp(),
             'updated_ids': []
@@ -138,6 +138,7 @@ class Datastore(DataManager):
         logging.info(f"Group {group_id} created")
 
     def add_user_to_group(self, group_id, user_id):
+        print("inside add_user_to_group group id", group_id, "users", user_id)
         self.groups[group_id]['users'].append(user_id)
         logging.info(f"{user_id} joined {group_id}")
         self.save_message({"group_id": group_id, 
@@ -148,6 +149,8 @@ class Datastore(DataManager):
         "message_type": C.USER_JOIN})
     
     def remove_user_from_group(self, group_id, user_id):
+        if user_id not in self.groups[group_id]['users']:
+            return
         index = self.groups[group_id]['users'].index(user_id)
         del self.groups[group_id]['users'][index]
         logging.info(f"{user_id} removed from {group_id}")
