@@ -8,6 +8,7 @@ This project includes a group chat service that implements a server that is resp
 ### Build Docker Image
 `docker build -t chat_system_team_18 .`
 
+## Single container setup
 ### Run Docker Container
 `docker run -it --rm chat_system_team_18:latest --name chat_system_team_18 bash`
 
