@@ -12,7 +12,7 @@ This project includes a group chat service that implements a server that is resp
 ### Run Docker Container
 `docker run -it --rm chat_system_team_18:latest --name chat_system_team_18 bash`
 
---rm arguments tells docker to remove the container as soon as its closed.
+--rm argument tells docker to remove the container as soon as its closed.
 
 ### Start the server
 `python3 run_chat_server.py`
