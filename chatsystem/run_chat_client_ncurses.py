@@ -418,72 +418,72 @@ def run():
             command = user_input.split(' ')[0].strip()
         else:
             command = user_input
-        # try:
-        group_id = ''
-        # connect mode : c
-        if command in C.CONNECTION_COMMANDS:
-            server_string = user_input[2:].strip()
-            if server_string == '':
-                server_string = C.DEFAULT_SERVER_CONNECTION_STRING
-            stub = join_server(server_string)
+        try:
+            group_id = ''
+            # connect mode : c
+            if command in C.CONNECTION_COMMANDS:
+                server_string = user_input[2:].strip()
+                if server_string == '':
+                    server_string = C.DEFAULT_SERVER_CONNECTION_STRING
+                stub = join_server(server_string)
 
-        # exit mode: q 
-        elif command in C.EXIT_APP_COMMANDS:
-            close_connection(channel=state.get(C.ACTIVE_CHANNEL))
-            break
+            # exit mode: q 
+            elif command in C.EXIT_APP_COMMANDS:
+                close_connection(channel=state.get(C.ACTIVE_CHANNEL))
+                break
 
-        # login user mode: u
-        elif command in C.LOGIN_COMMANDS:
-            user_id = user_input[2:].strip()
-            if len(user_id) < 1:
-                raise Exception("Invalid user_id")
-            get_user_connection(stub, user_id)
+            # login user mode: u
+            elif command in C.LOGIN_COMMANDS:
+                user_id = user_input[2:].strip()
+                if len(user_id) < 1:
+                    raise Exception("Invalid user_id")
+                get_user_connection(stub, user_id)
 
-        # join group mode: j
-        elif command in C.JOIN_GROUP_COMMANDS:
-            group_id = user_input[2:].strip()
-            if len(group_id) < 1:
-                raise Exception("Invalid group_id")
-            enter_group_chat(stub, group_id, change_group_event)
+            # join group mode: j
+            elif command in C.JOIN_GROUP_COMMANDS:
+                group_id = user_input[2:].strip()
+                if len(group_id) < 1:
+                    raise Exception("Invalid group_id")
+                enter_group_chat(stub, group_id, change_group_event)
 
-        # join group mode: p
-        elif command in C.PRINT_HISTORY_COMMANDS:
-            state[C.MESSAGE_START_IDX] = 0
-            state[C.MESSAGE_ID_TO_NUMBER_MAP] = {}
-            state[C.TEXT_ID_TO_NUMBER_MAP] = {}
-            state[C.MESSAGE_NUMBER] = 0
-            state[C.TEXT_MSG_IDX] = 0
-            state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
-            state[C.MESSAGES] = {}
-            change_group_event.set()
-            display_manager.info('Chat History is printed successfully')
-        
-        # like mode: l
-        elif command in C.LIKE_COMMANDS or command in C.UNLIKE_COMMANDS:
-            splits = user_input.split(" ")
-            message_number = splits[1]
-            if not message_number.isdigit():
-                raise Exception("Invalid command")
-            message_number = int(message_number)
-            post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
-            display_manager.info('')
-
-        # typing mode & also implement get messages mode
-        elif command in C.APPEND_TO_CHAT_COMMANDS:
-            splits = user_input.split(" ")
-            message_number = splits[1]
-            message_text = " ".join(splits[1:]).strip()
-            post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
-            display_manager.info('')
-        
-        else:
-            display_manager.error('Not a valid command!')
+            # join group mode: p
+            elif command in C.PRINT_HISTORY_COMMANDS:
+                state[C.MESSAGE_START_IDX] = 0
+                state[C.MESSAGE_ID_TO_NUMBER_MAP] = {}
+                state[C.TEXT_ID_TO_NUMBER_MAP] = {}
+                state[C.MESSAGE_NUMBER] = 0
+                state[C.TEXT_MSG_IDX] = 0
+                state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
+                state[C.MESSAGES] = {}
+                change_group_event.set()
+                display_manager.info('Chat History is printed successfully')
             
-        # except grpc.RpcError as rpcError:
-        #     logging.error(f"grpc exception: {rpcError}")
-        # except Exception as e:
-        #     logging.error(
-        #         f"Error: {e}")
+            # like mode: l
+            elif command in C.LIKE_COMMANDS or command in C.UNLIKE_COMMANDS:
+                splits = user_input.split(" ")
+                message_number = splits[1]
+                if not message_number.isdigit():
+                    raise Exception("Invalid command")
+                message_number = int(message_number)
+                post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
+                display_manager.info('')
+
+            # typing mode & also implement get messages mode
+            elif command in C.APPEND_TO_CHAT_COMMANDS:
+                splits = user_input.split(" ")
+                message_number = splits[1]
+                message_text = " ".join(splits[1:]).strip()
+                post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
+                display_manager.info('')
+            
+            else:
+                display_manager.error('Not a valid command!')
+            
+        except grpc.RpcError as rpcError:
+            display_manager.error(f"grpc exception: {rpcError}")
+        except Exception as e:
+            display_manager.error(
+                f"Error: {e}")
 
 
 if __name__ == "__main__":

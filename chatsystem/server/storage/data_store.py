@@ -43,7 +43,7 @@ class Datastore(DataManager):
         super().__init__()
         self._lock = threading.Lock()
         self.messages = ServerCollection(messages)
-        self.users = ServerCollection(users)
+        self.sessions = ServerCollection(users)
         self.groups = ServerCollection(groups)
         self.load_from_file()
 
@@ -87,10 +87,10 @@ class Datastore(DataManager):
             "timestamp": get_timestamp(),
             "is_active": is_active
         }
-        self.users[session_id] = session
+        self.sessions[session_id] = session
 
     def get_session_info(self, session_id):
-        return self.users.get(session_id)
+        return self.sessions.get(session_id)
 
     def get_message_list(self, message_ids):
         """
@@ -170,7 +170,7 @@ class Datastore(DataManager):
             with open(C.DATA_STORE_FILE_PATH) as rf:
                 server_data = json.load(rf)
                 self.messages = ServerCollection(server_data.get("messages", {}))
-                self.users = ServerCollection(server_data.get("users", {}))
+                self.sessions = ServerCollection(server_data.get("sessions", {}))
                 self.groups = ServerCollection(server_data.get("groups", {}))
     
     def save_on_file(self):
@@ -178,7 +178,7 @@ class Datastore(DataManager):
         if C.STORE_DATA_ON_FILE_SYSTEM:
             server_data = {
                 'messages': self.messages.get_dict(),
-                'users': self.users.get_dict(),
+                'sessions': self.sessions.get_dict(),
                 'groups': self.groups.get_dict(),
             }
             with open(C.DATA_STORE_FILE_PATH, 'w') as wf:
