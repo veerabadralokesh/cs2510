@@ -138,7 +138,7 @@ class Datastore(DataManager):
         logging.info(f"Group {group_id} created")
 
     def add_user_to_group(self, group_id, user_id):
-        print("inside add_user_to_group group id", group_id, "users", user_id)
+        # print("inside add_user_to_group group id", group_id, "users", user_id)
         self.groups[group_id]['users'].append(user_id)
         logging.info(f"{user_id} joined {group_id}")
         self.save_message({"group_id": group_id, 

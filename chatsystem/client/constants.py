@@ -51,3 +51,6 @@ USER_JOIN = 'joined'
 USER_LEFT = 'left'
 
 INPUT_PROMPT = "Enter command"
+NEW_MESSAGE_SCROLL = "New message arrived, scrolling to the bottom"
+SCROLL_REACHED_BOTTOM = "Reached bottom of messages"
+SCROLL_REACHED_TOP = "Reached top of messages"

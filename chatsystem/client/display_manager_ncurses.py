@@ -10,6 +10,7 @@ for i in range(32, 127):
 class DisplayManagerCurses():
     def __init__(self, stdscr) -> None:
         super().__init__()
+        self.chars = []
         self.stdscr = stdscr
         self.stdscr.clear()
         self.stdscr.refresh()
@@ -19,6 +20,7 @@ class DisplayManagerCurses():
         self.group_name = ""
         self.participants = ""
         self.INPUT_PROMPT = C.INPUT_PROMPT + ": "
+        self.scrollposition = 0
         self.resize()
         self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
 
@@ -28,8 +30,8 @@ class DisplayManagerCurses():
             return
         message_indices = sorted(list(self.message_data.keys()))
         total_lines = len(message_indices)
-        start = max(0, total_lines - max_lines) 
-        end = total_lines
+        start = max(0, total_lines - max_lines - self.scrollposition)
+        end = total_lines - self.scrollposition
         # if self.message_data:
             # print(self.message_data)
         for display_index, line_index in enumerate(message_indices[start:end]):
@@ -42,6 +44,11 @@ class DisplayManagerCurses():
         
         if self.group_name != "" and len(message) > 0:
             self.message_data[msg_indx] = message
+            if self.scrollposition > 0:
+                self.scrollposition = 0
+                self.info(C.NEW_MESSAGE_SCROLL)
+            else:
+                self.info("")
 
         self.message_idx += 1
         self.render_messages()
@@ -84,6 +91,14 @@ class DisplayManagerCurses():
         self.stdscr.refresh()
 
     def delete_chat_char(self, chars):
+        if len(chars) > self.cursor_position:
+            self.stdscr.addstr(self.input_line, 0, self.clear_line)
+            chars.pop(self.cursor_position)
+            self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars))
+            self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
+            self.stdscr.refresh()
+
+    def backspace_chat_char(self, chars):
         if len(chars) > 0:
             self.stdscr.addstr(self.input_line, 0, self.clear_line)
             chars.pop(self.cursor_position-1)
@@ -100,15 +115,53 @@ class DisplayManagerCurses():
         self.stdscr.refresh()
         self.cursor_position = 0
         return s
+    
+    def scroll(self, c):
+        max_lines = self.message_end_line - 2
+        ## scroll up
+        if c == 258:
+            self.scrollposition -= 1
+            if self.scrollposition < 0:
+                self.info(C.SCROLL_REACHED_BOTTOM)
+            else:
+                self.info("")
+            self.scrollposition = max(0, self.scrollposition)
+        ## scroll down
+        if c == 259:
+            self.scrollposition += 1
+            if self.scrollposition >= len(self.message_data)-max_lines:
+                self.info(C.SCROLL_REACHED_TOP)
+            else:
+                self.info("")
+            self.scrollposition = min(len(self.message_data)-max_lines, self.scrollposition)
+        ## page down
+        if c == 338:
+            self.scrollposition -= max_lines
+            if self.scrollposition < 0:
+                self.info(C.SCROLL_REACHED_BOTTOM)
+            else:
+                self.info("")
+            self.scrollposition = max(0, self.scrollposition)
+        ## page up
+        if c == 339:
+            self.scrollposition += max_lines
+            if self.scrollposition >= len(self.message_data)-max_lines:
+                self.info(C.SCROLL_REACHED_TOP)
+            else:
+                self.info("")
+            self.scrollposition = min(len(self.message_data)-max_lines, self.scrollposition)
+        self.render_messages()
 
     def read(self, prompt=""):
         stdscr = self.stdscr
-        chars = []
+        chars = self.chars
         while True:
             c = stdscr.getch()
             if c in allowed_chat_chars:
                 self.add_allowed_chat_chars(chars, c)
             elif c == 127 or c == curses.KEY_BACKSPACE:
+                self.backspace_chat_char(chars)
+            elif c == 330 or c == curses.KEY_DC:
                 self.delete_chat_char(chars)
             elif c == 260: # left arrow
                 self.cursor_position = max(0, self.cursor_position-1)
@@ -120,11 +173,20 @@ class DisplayManagerCurses():
                 stdscr.refresh()
             elif c == ord('\n') or c == curses.KEY_ENTER:
                 s =  self.submit_input(chars)
-                chars = []
+                self.chars = []
                 return s
             elif c == curses.KEY_RESIZE:
                 self.resize()
+            elif c in [258, 259, 339, 338]: ## Scroll up and down with mouse or arrow keys and also using page up and page down
+                self.scroll(c)
+            elif c == 262 or C == curses.KEY_HOME: ## Home button
+                self.cursor_position = 0
+                self.set_cursor_position()
+            elif c == 360 or C == curses.KEY_END: ## End button
+                self.cursor_position = len(chars)
+                self.set_cursor_position()
             else:
+                # print(c)
                 pass
     
     def set_user(self, user_id):
@@ -178,8 +240,12 @@ class DisplayManagerCurses():
         self.x = x
         self.input_line = y-1
         self.clear_line = " " * (x-1)
-        self.message_end_line = y - 3
+        self.message_end_line = y - 4
+        self.stdscr.clear()
         if self.group_name:
             self.render_header()
         self.render_messages()
+        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars))
+        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars[:self.cursor_position]))
+        self.stdscr.refresh()
 

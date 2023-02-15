@@ -139,19 +139,20 @@ def cancel_rpc(event, grpc_context):
     event.clear()
     pass
 
-def update_participants(message):
+def update_participants(message, start_timestamp):
     if message.group_id == state.get(C.ACTIVE_GROUP_KEY):
         group_data = state.get(C.GROUP_DATA)
         if group_data is None: return
         participants = group_data['users']
         # print("check 1", participants)
         if message.message_type == C.USER_JOIN:
-            if message.user_id not in participants:
+            if int(message.creation_time) > start_timestamp:
                 participants.append(message.user_id)
         elif message.message_type == C.USER_LEFT:
             try:
-                index = participants.index(message.user_id)
-                del participants[index]
+                if int(message.creation_time) > start_timestamp:
+                    index = participants.index(message.user_id)
+                    del participants[index]
             except:
                 pass
         # print("check 2", participants)
@@ -172,6 +173,7 @@ def get_messages(change_group_event):
         cancel_messages_thread = Thread(target=cancel_rpc, args=[change_group_event, messages], daemon=True)
         cancel_messages_thread.start()
         try:
+            start_timestamp = get_timestamp()
             for message in messages:
                 if message.message_id not in state[C.MESSAGE_ID_TO_NUMBER_MAP]:
                     state[C.MESSAGE_NUMBER] += 1
@@ -181,8 +183,8 @@ def get_messages(change_group_event):
                 msg_indx = state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]
 
                 if message.message_type in (C.USER_JOIN, C.USER_LEFT):
-                    display_manager.write(msg_indx, f"{datetime.fromtimestamp(int(message.creation_time/10**6))}: {message.user_id} {message.message_type} {message.group_id}.")
-                    update_participants(message)
+                    display_manager.write(msg_indx, f"{message.user_id} {message.message_type} group ({datetime.fromtimestamp(int(message.creation_time/10**6))}).")
+                    update_participants(message, start_timestamp)
                     continue
                 else:
                     if message.message_id not in state[C.TEXT_ID_TO_NUMBER_MAP]:
@@ -286,7 +288,7 @@ def enter_group_chat(stub, group_id, change_group_event):
         else:
             raise Exception("Entering group not successful")
     except Exception as ex:
-        display_manager.write(f"Error: {ex}. Please try again.")
+        display_manager.error(f"{ex}. Please try again.")
         raise ex
 
 
