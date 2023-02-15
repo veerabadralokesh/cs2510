@@ -5,10 +5,10 @@
 In this project, we will implement a group chat service that includes a server that is responsible for storing and delivering chats and a client program that enables users to participate in chat groups, exchange messages, and receive messages from other participants. 
 
 
-## Build Docker image
+## Build Docker Image
 `docker build -t 'chat_system_team_18' .`
 
-## Run docker container
+## Run Docker Container
 `docker run -it chat_system_team_18:latest bash`
 
 ## Start the server
