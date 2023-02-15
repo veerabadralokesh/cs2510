@@ -79,13 +79,14 @@ class Datastore(DataManager):
                     original_message["likes"][key] = val
                 self.groups[group_id]["updated_ids"].append(message_id)
             
-    def save_session_info(self, session_id, user_id, group_id=None, is_active=True):
+    def save_session_info(self, session_id, user_id, group_id=None, is_active=True, context=None):
         session = {
             "session_id": session_id, 
             "user_id": user_id,
             "group_id": group_id,
             "timestamp": get_timestamp(),
-            "is_active": is_active
+            "is_active": is_active,
+            "context": context
         }
         self.sessions[session_id] = session
 

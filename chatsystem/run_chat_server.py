@@ -74,15 +74,23 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         last_msg_idx = request.message_start_idx
         updated_idx = None
 
+        user_id = request.user_id
+        group_id = request.group_id
+        session_id = request.session_id
+
+        data_store.save_session_info(session_id, user_id=user_id, group_id=group_id, context=context)
+
         while True:
             if not context.is_active():
-                session_info = data_store.get_session_info(request.session_id)
-                if session_info["group_id"] == request.group_id:
-                    data_store.remove_user_from_group(request.group_id, request.user_id)
-                    data_store.save_session_info(request.session_id, request.user_id, is_active=False)
-                    self.new_message_event.set()
+                session_info = data_store.get_session_info(session_id)
+                if session_info["group_id"] == group_id:
+                    session_info = data_store.get_session_info(session_id)
+                    if session_info.get('context') and not session_info.get('context').is_active():
+                        data_store.remove_user_from_group(group_id, user_id)
+                        data_store.save_session_info(session_id, user_id, is_active=False)
+                        self.new_message_event.set()
                 break
-            last_msg_idx, new_messages, updated_idx = data_store.get_messages(request.group_id, start_index=last_msg_idx, updated_idx=updated_idx)
+            last_msg_idx, new_messages, updated_idx = data_store.get_messages(group_id, start_index=last_msg_idx, updated_idx=updated_idx)
             
             for new_message in new_messages:
                 
