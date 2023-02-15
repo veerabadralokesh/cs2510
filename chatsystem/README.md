@@ -36,6 +36,9 @@ docker run -it --rm --name client --network cs2510 chat_system_team_18
 `docker run -it --rm --name server --network host chat_system_team_18`
 ### Client
 `docker run -it --rm --name client --network host chat_system_team_18`
+## Application Demo Video
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/PPqlEYtEwCw/0.jpg)](https://www.youtube.com/watch?v=PPqlEYtEwCw)
+
 
 ## Team
 Arushi Sharma
