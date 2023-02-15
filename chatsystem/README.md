@@ -2,7 +2,7 @@
 
 ## CS 2510: (Distributed) Computer Operating Systems
 
-In this project, we will implement a group chat service that includes a server that is responsible for storing and delivering chats and a client program that enables users to participate in chat groups, exchange messages, and receive messages from other participants. 
+This project includes a group chat service that implements a server that is responsible for storing and delivering chats and a client program that enables users to participate in chat groups, exchange messages, and receive messages from other participants. 
 
 
 ## Build Docker Image
@@ -22,6 +22,6 @@ python3 run_chat_client_ncurses.py
 
 ## Team
 Arushi Sharma
-<br />
+<br/>
 Veerabadra Lokesh
 
