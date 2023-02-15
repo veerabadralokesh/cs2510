@@ -20,6 +20,7 @@ class DisplayManagerCurses():
         self.participants = ""
         self.INPUT_PROMPT = C.INPUT_PROMPT + ": "
         self.resize()
+        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
 
     def render_messages(self):
         max_lines = self.message_end_line - 2

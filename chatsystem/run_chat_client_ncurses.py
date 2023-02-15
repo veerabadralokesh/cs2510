@@ -181,7 +181,7 @@ def get_messages(change_group_event):
                 msg_indx = state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]
 
                 if message.message_type in (C.USER_JOIN, C.USER_LEFT):
-                    display_manager.write(msg_indx, f"{datetime.fromtimestamp(int(message.creation_time)/10**6)}: {message.user_id} {message.message_type} {message.group_id}.")
+                    display_manager.write(msg_indx, f"{datetime.fromtimestamp(int(message.creation_time/10**6))}: {message.user_id} {message.message_type} {message.group_id}.")
                     update_participants(message)
                     continue
                 else:
