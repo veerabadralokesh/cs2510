@@ -20,7 +20,6 @@ def get_messages():
 def get_group_details(group_id: str, user_id: str) -> chat_system_pb2.GroupDetails:
 
     if not data_store.get_group(group_id):
-        print("calling create_group", group_id)
         data_store.create_group(group_id)
 
     data_store.add_user_to_group(group_id, user_id)
@@ -53,7 +52,6 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         return status
     
     def GetGroup(self, request, context):
-        print("inside get group")
         group_id = request.group_id
         user_id = request.user_id
         group_details = get_group_details(group_id, user_id)
@@ -73,7 +71,6 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
     def GetMessages(self, request, context):
         prev_messages = []
-        # print("enter get messages")
         last_msg_idx = request.message_start_idx
         updated_idx = None
 
@@ -85,9 +82,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                     data_store.save_session_info(request.session_id, request.user_id, is_active=False)
                     self.new_message_event.set()
                 break
-            # print("message in group", request.group_id, ":", data_store.get_messages(request.group_id))
             last_msg_idx, new_messages, updated_idx = data_store.get_messages(request.group_id, start_index=last_msg_idx, updated_idx=updated_idx)
-            print("updated_idx",updated_idx)
+            
             for new_message in new_messages:
                 
                 message_grpc = chat_system_pb2.Message(
@@ -104,8 +100,6 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
             self.new_message_event.clear()
             self.new_message_event.wait()
-        print("User switched group")
-        # create message ("User ID" left the chat)
 
 
     def PostMessage(self, request, context):
