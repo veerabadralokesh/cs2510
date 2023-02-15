@@ -124,7 +124,7 @@ def serve():
     data_store = None
     try:
         data_store = Datastore()
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10000))
         chat_system_pb2_grpc.add_ChatServerServicer_to_server(
             ChatServerServicer(data_store), server
         )

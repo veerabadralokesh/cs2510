@@ -428,16 +428,12 @@ def run():
             elif command in C.APPEND_TO_CHAT_COMMANDS:
                 splits = user_input.split(" ")
                 message_number = splits[1]
-                message_text = " ".join(splits[2:])
-                if not message_number.isdigit():
-                    raise Exception("Invalid command")
-                message_number = int(message_number)
-                post_message(message_text, post_message_queue, post_message_event, message_number, message_type=command)
-
-            # typing mode & also implement get messages mode
-            else:
-                message_text = user_input
+                message_text = " ".join(splits[1:]).strip()
                 post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
+
+            
+            else:
+                display_manager.error('Not a valid command!')
         except grpc.RpcError as rpcError:
             logging.error(f"grpc exception: {rpcError}")
         except Exception as e:

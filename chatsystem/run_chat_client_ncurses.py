@@ -149,8 +149,11 @@ def update_participants(message):
             if message.user_id not in participants:
                 participants.append(message.user_id)
         elif message.message_type == C.USER_LEFT:
-            index = participants.index(message.user_id)
-            del participants[index]
+            try:
+                index = participants.index(message.user_id)
+                del participants[index]
+            except:
+                pass
         # print("check 2", participants)
         display_manager.write_header(group_name=f"Group: {state.get(C.ACTIVE_GROUP_KEY)}",
                     participants=f"Participants: {', '.join(set(participants))}")
@@ -453,6 +456,7 @@ def run():
             state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
             state[C.MESSAGES] = {}
             change_group_event.set()
+            display_manager.info('Chat History is printed successfully')
         
         # like mode: l
         elif command in C.LIKE_COMMANDS or command in C.UNLIKE_COMMANDS:
@@ -462,21 +466,19 @@ def run():
                 raise Exception("Invalid command")
             message_number = int(message_number)
             post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
+            display_manager.info('')
 
-        # append mode: a
+        # typing mode & also implement get messages mode
         elif command in C.APPEND_TO_CHAT_COMMANDS:
             splits = user_input.split(" ")
             message_number = splits[1]
-            message_text = " ".join(splits[2:])
-            if not message_number.isdigit():
-                raise Exception("Invalid command")
-            message_number = int(message_number)
-            post_message(message_text, post_message_queue, post_message_event, message_number, message_type=command)
-
-        # typing mode & also implement get messages mode
-        else:
-            message_text = user_input
+            message_text = " ".join(splits[1:]).strip()
             post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
+            display_manager.info('')
+        
+        else:
+            display_manager.error('Not a valid command!')
+            
         # except grpc.RpcError as rpcError:
         #     logging.error(f"grpc exception: {rpcError}")
         # except Exception as e:
