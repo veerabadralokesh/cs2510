@@ -20,6 +20,10 @@ docker exec -it docker-container-id bash
 python3 run_chat_client_ncurses.py
 ```
 
+## Application Demo Video
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/PPqlEYtEwCw/0.jpg)](https://www.youtube.com/watch?v=PPqlEYtEwCw)
+
+
 ## Team
 Arushi Sharma
 <br/>
