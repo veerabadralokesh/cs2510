@@ -15,9 +15,10 @@ In this project, we will implement a group chat service that includes a server t
 `python3 run_chat_server.py`
 
 ## Start the client in another terminal
-`docker exec -it docker-container-id bash`
-`python3 run_chat_client_ncurses.py`
-
+```
+docker exec -it docker-container-id bash
+python3 run_chat_client_ncurses.py
+```
 
 ## Team
 Arushi Sharma
