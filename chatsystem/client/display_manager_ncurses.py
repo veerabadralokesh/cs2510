@@ -84,7 +84,7 @@ class DisplayManagerCurses():
 
     def delete_chat_char(self, chars):
         if len(chars) > 0:
-            self.stdscr.addstr(self.input_line, 0, " "*len(chars))
+            self.stdscr.addstr(self.input_line, 0, self.clear_line)
             chars.pop(self.cursor_position-1)
             self.cursor_position = max(0, self.cursor_position-1)
             #stdscr.clear()
@@ -139,9 +139,8 @@ class DisplayManagerCurses():
         if group_name == "":
             self.message_data = {}
             self.stdscr.clear()
-            self.message_idx = 0
-            self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
             self.stdscr.refresh()
+            self.message_idx = 0
         else:
             self.render_header()
 
@@ -154,6 +153,7 @@ class DisplayManagerCurses():
             self.participants = self.participants[:self.x-4] + "..." 
 
         self.stdscr.addstr(1, 0, self.participants)
+        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
         self.stdscr.refresh()
         self.set_cursor_position()
     
