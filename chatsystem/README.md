@@ -4,21 +4,38 @@
 
 This project includes a group chat service that implements a server that is responsible for storing and delivering chats and a client program that enables users to participate in chat groups, exchange messages, and receive messages from other participants. 
 
-
-## Build Docker Image
+## Docker setup
+### Build Docker Image
 `docker build -t chat_system_team_18 .`
 
-## Run Docker Container
-`docker run -it chat_system_team_18:latest bash`
+### Run Docker Container
+`docker run -it --rm chat_system_team_18:latest --name chat_system_team_18 bash`
 
-## Start the server
+--rm arguments tells docker to remove the container as soon as its closed.
+
+### Start the server
 `python3 run_chat_server.py`
 
-## Start the client in another terminal
+### Start the client in another terminal
 ```
-docker exec -it docker-container-id bash
+docker exec -it chat_system_team_18 bash
 python3 run_chat_client_ncurses.py
 ```
+
+## Multiple container setup
+### Network bride
+`docker network create --driver bridge cs2510`
+
+### Run server and client
+```
+docker run -it --rm --name server --network cs2510 chat_system_team_18
+docker run -it --rm --name client --network cs2510 chat_system_team_18
+```
+## Multiple hosts setup
+### Server
+`docker run -it --rm --name server --network host chat_system_team_18`
+### Client
+`docker run -it --rm --name client --network host chat_system_team_18`
 
 ## Team
 Arushi Sharma
