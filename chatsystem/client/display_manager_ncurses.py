@@ -307,7 +307,7 @@ class DisplayManagerCurses():
             self.render_header()
         self.render_messages()
         self.render_input()
-        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars))
-        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars[:self.cursor_position]))
+        # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars))
+        # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars[:self.cursor_position]))
         self.stdscr.refresh()
 
