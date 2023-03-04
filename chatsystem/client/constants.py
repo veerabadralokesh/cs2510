@@ -54,3 +54,17 @@ INPUT_PROMPT = "Enter command"
 NEW_MESSAGE_SCROLL = "New message arrived, scrolling to the bottom"
 SCROLL_REACHED_BOTTOM = "Reached bottom of messages"
 SCROLL_REACHED_TOP = "Reached top of messages"
+
+
+INIT_MESSAGES = {
+    0: "Commands",
+    1: "c {server address:port}\t connect to server",
+    2: "u {username}\t\t login with username",
+    3: "j {group}\t\t join group",
+    4: "a {message}\t\t send message in the group",
+    5: "l {message_id}\t\t like the message with message_id",
+    6: "r {message_id}\t\t remove like for the message with message_id",
+    7: "p \t\t\t print message history of the group",
+    8: "v \t\t\t print server's current view of which servers it can currently communicate with",
+    9: "q \t\t\t Quit"
+}

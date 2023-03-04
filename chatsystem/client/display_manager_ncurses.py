@@ -20,9 +20,15 @@ class DisplayManagerCurses():
         self.group_name = ""
         self.participants = ""
         self.INPUT_PROMPT = C.INPUT_PROMPT + ": "
+        self.previous_input_length = len(self.INPUT_PROMPT)
         self.scrollposition = 0
+        self.init_messages()
         self.resize()
         self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
+
+    def init_messages(self):
+        self.group_name = "Chat Client - Team 18"
+        self.message_data = C.INIT_MESSAGES
 
     def render_messages(self):
         max_lines = self.message_end_line - 2
@@ -56,8 +62,8 @@ class DisplayManagerCurses():
     def display_info(self, display_string):
         if len(display_string) > self.x - 1:
             display_string = display_string[:self.x-4] + "..." 
-        self.stdscr.addstr(self.y - 2, 0, self.clear_line)
-        self.stdscr.addstr(self.y - 2, 0, display_string)
+        self.stdscr.addstr(self.info_line, 0, self.clear_line)
+        self.stdscr.addstr(self.info_line, 0, display_string)
         self.set_cursor_position()
         self.stdscr.refresh()
 
@@ -82,21 +88,40 @@ class DisplayManagerCurses():
             # logging.debug(*args)
             pass
     
+    def resize_if_needed(self):
+        self.current_input_length = len(self.chars) + len(self.INPUT_PROMPT)
+
+        if self.current_input_length % (self.x) == 0:# and self.previous_input_length > self.current_input_length:
+            self.resize()
+            return True
+        if self.previous_input_length % (self.x) == self.x - 1:# and self.current_input_length > self.previous_input_length:
+            self.resize()
+            return True
+
+        self.previous_input_length = self.current_input_length
+        return False
+        
+    
     def add_allowed_chat_chars(self, chars, c):
         ch = chr(c)
         chars.insert(self.cursor_position, ch)
-        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars))
+        # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars))
+        # self.cursor_position += 1
+        # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
+        # self.stdscr.refresh()
         self.cursor_position += 1
-        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
-        self.stdscr.refresh()
+        if not self.resize_if_needed():
+            self.render_input()
 
     def delete_chat_char(self, chars):
         if len(chars) > self.cursor_position:
             self.stdscr.addstr(self.input_line, 0, self.clear_line)
             chars.pop(self.cursor_position)
-            self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars))
-            self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
-            self.stdscr.refresh()
+            # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars))
+            # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
+            # self.stdscr.refresh()
+            if not self.resize_if_needed():
+                self.render_input()
 
     def backspace_chat_char(self, chars):
         if len(chars) > 0:
@@ -104,15 +129,17 @@ class DisplayManagerCurses():
             chars.pop(self.cursor_position-1)
             self.cursor_position = max(0, self.cursor_position-1)
             #stdscr.clear()
-            self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars))
-            self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
-            self.stdscr.refresh()
+            # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars))
+            # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
+            # self.stdscr.refresh()
+            if not self.resize_if_needed():
+                self.render_input()
 
     def submit_input(self, chars):
         s = "".join(chars)
-        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + " " * min(len(chars), self.x-1))
-        self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
-        self.stdscr.refresh()
+        # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + " " * min(len(chars), self.x-1))
+        # self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
+        # self.stdscr.refresh()
         self.cursor_position = 0
         return s
     
@@ -152,6 +179,25 @@ class DisplayManagerCurses():
             self.scrollposition = min(len(self.message_data)-max_lines, self.scrollposition)
         self.render_messages()
 
+    def render_input(self):
+        ## remove this try
+        try:
+            total_input = self.INPUT_PROMPT + "".join(self.chars)
+            max_char_length = self.x
+            line_offset = 0
+            if len(self.chars) > 0:
+                while len(total_input) > 0:
+                    self.stdscr.addstr(self.input_line + line_offset, 0, total_input[:max_char_length])
+                    total_input = total_input[max_char_length:]
+                    line_offset += 1
+            else:
+                self.stdscr.addstr(self.input_line, 0, self.clear_line)
+                self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "")
+            self.set_cursor_position()
+        except Exception as e:
+            raise Exception(self.input_lines_count, (len(self.chars) + len(self.INPUT_PROMPT)), self.x)
+        self.stdscr.refresh()
+
     def read(self, prompt=""):
         stdscr = self.stdscr
         chars = self.chars
@@ -165,15 +211,19 @@ class DisplayManagerCurses():
                 self.delete_chat_char(chars)
             elif c == 260: # left arrow
                 self.cursor_position = max(0, self.cursor_position-1)
-                stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
-                stdscr.refresh()
+                # stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
+                # stdscr.refresh()
+                self.render_input()
             elif c == 261: # right arrow
                 self.cursor_position = min(len(chars), self.cursor_position+1)
-                stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
-                stdscr.refresh()
+                # stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(chars[:self.cursor_position]))
+                # stdscr.refresh()
+                self.render_input()
             elif c == ord('\n') or c == curses.KEY_ENTER:
                 s =  self.submit_input(chars)
                 self.chars = []
+                if not self.resize_if_needed():
+                    self.render_input()
                 return s
             elif c == curses.KEY_RESIZE:
                 self.resize()
@@ -196,16 +246,18 @@ class DisplayManagerCurses():
         self.stdscr.refresh()
 
     def write_header(self, group_name, participants):
-        self.group_name = group_name
-        self.participants = participants
 
-        if group_name == "":
+        if group_name == "" or group_name != self.group_name:
+            self.group_name = group_name
+            self.participants = participants
             self.message_data = {}
             self.stdscr.clear()
             self.stdscr.refresh()
             self.message_idx = 0
         else:
-            self.render_header()
+            self.group_name = group_name
+            self.participants = participants
+        self.render_header()
 
     def render_header(self):
         self.stdscr.addstr(0, 0, self.clear_line)
@@ -221,7 +273,14 @@ class DisplayManagerCurses():
         self.set_cursor_position()
     
     def set_cursor_position(self):
-        self.stdscr.addstr(self.input_line, len(self.INPUT_PROMPT) + self.cursor_position, "")
+        cursor_pos = len(self.INPUT_PROMPT) + self.cursor_position
+        ## remove this try
+        try:
+            line_offset = cursor_pos // self.x
+            cursor_offset = cursor_pos % self.x
+            self.stdscr.addstr(self.input_line + line_offset, cursor_offset, "")
+        except:
+            raise Exception(self.input_line, self.y, self.input_lines_count, cursor_pos, self.cursor_position, self.x)
         self.stdscr.refresh()
 
     def clear(self):
@@ -238,13 +297,16 @@ class DisplayManagerCurses():
         y, x = self.stdscr.getmaxyx()
         self.y = y
         self.x = x
-        self.input_line = y-1
+        self.input_lines_count = (len(self.chars) + len(self.INPUT_PROMPT) + 1)//x
+        self.input_line = y - 1 - self.input_lines_count
         self.clear_line = " " * (x-1)
-        self.message_end_line = y - 4
+        self.message_end_line = y - 4 - self.input_lines_count
+        self.info_line = y - 2 - self.input_lines_count
         self.stdscr.clear()
         if self.group_name:
             self.render_header()
         self.render_messages()
+        self.render_input()
         self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars))
         self.stdscr.addstr(self.input_line, 0, self.INPUT_PROMPT + "".join(self.chars[:self.cursor_position]))
         self.stdscr.refresh()
