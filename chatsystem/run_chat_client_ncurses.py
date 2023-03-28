@@ -114,24 +114,35 @@ def close_connection(stub=None, channel=None):
     state[C.STUB] = None
 
 
+def health_check_stream():
+    while True:
+        yield chat_system_pb2.ActiveSession(session_id=state.get(C.SESSION_ID))
+        state['user_joined_event'].wait()
+        state['user_joined_event'].clear()
+        # sleep(C.HEALTH_CHECK_INTERVAL)
+    pass
+
 def health_check():
     while True:
         try:
             stub = state.get(C.STUB)
             if stub is not None:
                 server_status = stub.HealthCheck(
-                    chat_system_pb2.ActiveSession(session_id=state.get(C.SESSION_ID))
+                    health_check_stream()
                     )
                 if server_status.status is True:
                     state[C.SERVER_ONLINE] = True
                 else:
+                    # display_manager.write("enter", "server_status.status ", server_status.status )
                     state[C.SERVER_ONLINE] = False
             else:
                 state[C.SERVER_ONLINE] = False
         except Exception as ex:
             state[C.SERVER_ONLINE] = False
             display_manager.warn('server disconnected')
-        sleep(C.HEALTH_CHECK_INTERVAL)
+        # sleep(C.HEALTH_CHECK_INTERVAL)
+        state['user_joined_event'].wait()
+        state['user_joined_event'].clear()
 
 def cancel_rpc(event, grpc_context):
     event.wait()
@@ -214,7 +225,7 @@ def get_messages(change_group_event):
 
 
 def join_server(server_string):
-#  '172.30.100.101:12000'
+
     if server_string == state.get(C.SERVER_CONNECTION_STRING):
         display_manager.info(f'Already connected to server {server_string}')
         return state.get(C.STUB)
@@ -246,11 +257,12 @@ def get_user_connection(stub, user_id):
                 display_manager.info(f"User {user_id} already logged in")
                 return
         status = stub.GetUser(chat_system_pb2.User(user_id=user_id))
-        state[C.SESSION_ID] = status.session_id
+        state[C.SESSION_ID] = status.statusMessage
         if status.status is True:
             display_manager.info(f"Login successful with user_id {user_id}")
             display_manager.set_user(user_id)
             state[C.ACTIVE_USER_KEY] = user_id
+            state['user_joined_event'].set()
         else:
             raise Exception("Login not successful")
     except grpc.RpcError as rpcError:
@@ -398,7 +410,7 @@ def run():
     
     status = None
     stub = None
-
+    state['user_joined_event'] = threading.Event()
     health_check_thread = Thread(target=health_check, daemon=True)
     health_check_thread.start()
 
