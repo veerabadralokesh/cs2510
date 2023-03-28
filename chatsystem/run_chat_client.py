@@ -129,7 +129,6 @@ def health_check():
             else:
                 state[C.SERVER_ONLINE] = False
         except Exception as ex:
-            print('checking', ex)
             state[C.SERVER_ONLINE] = False
             display_manager.warn('server disconnected')
         # sleep(C.HEALTH_CHECK_INTERVAL)
@@ -217,7 +216,6 @@ def get_user_connection(stub, user_id):
                 return
         status = stub.GetUser(chat_system_pb2.User(user_id=user_id))
         state[C.SESSION_ID] = status.statusMessage
-        print('check if state[C.SESSION_ID] is stored', state[C.SESSION_ID])
         if status.status is True:
             display_manager.info(f"Login successful with user_id {user_id}")
             state[C.ACTIVE_USER_KEY] = user_id
