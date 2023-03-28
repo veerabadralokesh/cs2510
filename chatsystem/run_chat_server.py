@@ -41,7 +41,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         user_id = request.user_id
         logging.info(f"Login request form user: {user_id}")
         session_id = get_unique_id()
-        status = chat_system_pb2.Status(status=True, statusMessage="")
+        status = chat_system_pb2.Status(status=True, statusMessage=session_id)
         data_store.save_session_info(session_id, user_id)
         return status
     
@@ -118,8 +118,22 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         self.new_message_event.set()
         return status
     
-    def HealthCheck(self, request, context):
+    def HealthCheck(self, request_iter, context):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
+        session_id = None
+        try:
+            for request in request_iter:
+                session_id = request.session_id
+        except Exception:
+            if session_id is not None:
+                session_info = data_store.get_session_info(session_id)
+                # if session_info.get('context') and not session_info.get('context').is_active():
+                group_id, user_id = session_info.get('group_id'), session_info.get('user_id')
+                if group_id is not None:
+                    data_store.remove_user_from_group(group_id, user_id)
+                    data_store.save_session_info(session_id, user_id, is_active=False)
+                    self.new_message_event.set()
+            pass
         return status
     
     def SendMessagetoServer(self):
@@ -133,7 +147,7 @@ def serve():
     data_store = None
     try:
         data_store = Datastore()
-        spm = ServerPoolManager()
+        spm = ServerPoolManager(id=1)
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10000))
         chat_system_pb2_grpc.add_ChatServerServicer_to_server(
             ChatServerServicer(data_store, spm), server

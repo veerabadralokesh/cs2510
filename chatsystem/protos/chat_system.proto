@@ -21,7 +21,9 @@ service ChatServer {
 
     rpc PostMessage(Message) returns (Status) {}
 
-    rpc HealthCheck(ActiveSession) returns (Status) {}
+    rpc HealthCheck(stream ActiveSession) returns (Status) {}
+
+    rpc SendMessagetoServer(Group) returns (stream Message) {}
 }
 
 message BlankMessage {}
