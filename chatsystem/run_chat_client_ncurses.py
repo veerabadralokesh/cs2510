@@ -214,7 +214,7 @@ def get_messages(change_group_event):
 
 
 def join_server(server_string):
-
+#  '172.30.100.101:12000'
     if server_string == state.get(C.SERVER_CONNECTION_STRING):
         display_manager.info(f'Already connected to server {server_string}')
         return state.get(C.STUB)

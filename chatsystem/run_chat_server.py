@@ -11,6 +11,7 @@ import server.constants as C
 from google.protobuf.json_format import MessageToDict
 from server.storage.data_store import Datastore
 from server.storage.utils import get_unique_id
+from server.server_pool_manager import ServerPoolManager
 
 data_store = Datastore()
 
@@ -29,11 +30,11 @@ def get_group_details(group_id: str, user_id: str) -> chat_system_pb2.GroupDetai
 
 class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
-    def __init__(self, data_store) -> None:
+    def __init__(self, data_store, spm) -> None:
         super().__init__()
         self.data_store = data_store
         self.new_message_event = threading.Event()
-
+        self.spm = spm
         pass
 
     def GetUser(self, request, context):
@@ -120,15 +121,22 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     def HealthCheck(self, request, context):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
+    
+    def SendMessagetoServer(self):
+        # whenever new message comes from client,
+        # send it to all connected servers
+        
+        pass
 
 
 def serve():
     data_store = None
     try:
         data_store = Datastore()
+        spm = ServerPoolManager()
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10000))
         chat_system_pb2_grpc.add_ChatServerServicer_to_server(
-            ChatServerServicer(data_store), server
+            ChatServerServicer(data_store, spm), server
         )
         server.add_insecure_port('[::]:12000')
         server.start()
