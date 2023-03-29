@@ -1,5 +1,5 @@
 
-
+import argparse
 import logging
 import threading
 from concurrent import futures
@@ -136,25 +136,43 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             pass
         return status
     
+    def Ping(self, request, context):
+        status = chat_system_pb2.Status(status=True, statusMessage = "")
+        return status
+
     def SendMessagetoServer(self):
         # whenever new message comes from client,
         # send it to all connected servers
         
         pass
 
+def get_args():
+    parser = argparse.ArgumentParser(description="Script for running CS 2510 Project 2 servers")
+    parser.add_argument('-id', type=int, help='Server Number', required=True)
+    args = parser.parse_args()
+    print(args)
+    return args
+
 
 def serve():
     data_store = None
+    args = get_args()
     try:
         data_store = Datastore()
-        spm = ServerPoolManager(id=1)
+        spm = ServerPoolManager(id=args.id)
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10000))
         chat_system_pb2_grpc.add_ChatServerServicer_to_server(
             ChatServerServicer(data_store, spm), server
         )
-        server.add_insecure_port('[::]:12000')
+        if C.USE_DIFFERENT_PORTS:
+            id = args.id
+            server.add_insecure_port(f'[::]:{(11999+id)}')
+            print(f"Server [::]:{(11999+id)} started")
+        else:
+            server.add_insecure_port('[::]:12000')
+            print("Server started")
         server.start()
-        print("Server started")
+        
         server.wait_for_termination()
     finally:
         if data_store is not None:

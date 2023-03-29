@@ -46,6 +46,11 @@ class ChatServerStub(object):
                 request_serializer=chat__system__pb2.Message.SerializeToString,
                 response_deserializer=chat__system__pb2.Status.FromString,
                 )
+        self.Ping = channel.unary_unary(
+                '/chatsystem.ChatServer/Ping',
+                request_serializer=chat__system__pb2.BlankMessage.SerializeToString,
+                response_deserializer=chat__system__pb2.Status.FromString,
+                )
         self.HealthCheck = channel.stream_unary(
                 '/chatsystem.ChatServer/HealthCheck',
                 request_serializer=chat__system__pb2.ActiveSession.SerializeToString,
@@ -99,6 +104,12 @@ class ChatServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Ping(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def HealthCheck(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -142,6 +153,11 @@ def add_ChatServerServicer_to_server(servicer, server):
             'PostMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.PostMessage,
                     request_deserializer=chat__system__pb2.Message.FromString,
+                    response_serializer=chat__system__pb2.Status.SerializeToString,
+            ),
+            'Ping': grpc.unary_unary_rpc_method_handler(
+                    servicer.Ping,
+                    request_deserializer=chat__system__pb2.BlankMessage.FromString,
                     response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
             'HealthCheck': grpc.stream_unary_rpc_method_handler(
@@ -264,6 +280,23 @@ class ChatServer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/PostMessage',
             chat__system__pb2.Message.SerializeToString,
+            chat__system__pb2.Status.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Ping(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/Ping',
+            chat__system__pb2.BlankMessage.SerializeToString,
             chat__system__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

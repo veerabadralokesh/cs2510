@@ -1,4 +1,5 @@
 import threading
+from time import sleep
 import grpc
 import chat_system_pb2
 import chat_system_pb2_grpc
@@ -8,7 +9,6 @@ class ServerState:
     def __init__(self, initial={}):
         self._lock = threading.Lock()
         self._state = initial
-        self.server_string = '172.30.100.101:12000'
 
     def __setitem__(self, key, value):
         with self._lock:
@@ -29,6 +29,24 @@ class ServerState:
     def get_dict(self):
         return self._state
 
+def connect_to_servers(active_stubs, num_servers, id):
+    while len(active_stubs) < num_servers-1:
+        for i in range(1, num_servers + 1):
+            try:
+                if id == i or active_stubs.get(i) is not None: 
+                    continue
+                if C.USE_DIFFERENT_PORTS:
+                    server_string = f'localhost:{(11999+i)}'
+                else:
+                    server_string = C.SERVER_STRING.format(i)
+                stub = join_server(server_string)
+                if stub:
+                    active_stubs[i] = stub
+
+            except Exception:
+                pass
+        sleep(C.CONNECT_SERVER_INTERVAL)
+
 class ServerPoolManager:
     def __init__(self, id) -> None:
         """
@@ -37,34 +55,16 @@ class ServerPoolManager:
         self.id = id
         self.num_servers = 5
         self.active_stubs = {}
+        t = threading.Thread(target=connect_to_servers, 
+                             daemon=True, 
+                             args=[self.active_stubs, self.num_servers, self.id])
+        t.start()
 
-    def connect_to_servers(self):
-        states = {}
-        for i in range(1, self.num_servers + 1):
-            if self.id == i: continue
-            state = ServerState()
-            states[i] = state
-            server_string = state.server_string
-            ip_add, port= server_string.split(":")
-            self.active_stubs[i] = self.join_server(ip_add[:-1]+f"{str(i)}:" + port, states[i])
-        
-        return self.active_stubs
-
-    def join_server(self, server_string, state):
-
-        if server_string == state.get(C.SERVER_CONNECTION_STRING):
-            print(f'Already connected to server {server_string}')
-            return state.get(C.STUB)
-        channel = state.get(C.ACTIVE_CHANNEL)
-
-        print(f"Trying to connect to server: {server_string}")
-        channel = grpc.insecure_channel(server_string)
-        stub = chat_system_pb2_grpc.ChatServerStub(channel)
-        server_status = stub.HealthCheck(chat_system_pb2.ActiveSession(session_id=None))
-        if server_status.status is True:
-            print("Server connection active")
-            state[C.ACTIVE_CHANNEL] = channel
-            state[C.SERVER_ONLINE] = True
-            state[C.SERVER_CONNECTION_STRING] = server_string
-            state[C.STUB] = stub
+def join_server(server_string):
+    print(f"Trying to connect to server: {server_string}")
+    channel = grpc.insecure_channel(server_string)
+    stub = chat_system_pb2_grpc.ChatServerStub(channel)
+    server_status = stub.Ping(chat_system_pb2.BlankMessage())
+    if server_status.status is True:
+        print(f"Connected to server: {server_string}")
         return stub

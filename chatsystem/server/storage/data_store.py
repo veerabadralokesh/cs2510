@@ -45,6 +45,7 @@ class Datastore(DataManager):
         self.messages = ServerCollection(messages)
         self.sessions = ServerCollection(users)
         self.groups = ServerCollection(groups)
+        self.loaded_data = False
         self.load_from_file()
 
     def save_message(self, message):
@@ -173,17 +174,21 @@ class Datastore(DataManager):
                 self.messages = ServerCollection(server_data.get("messages", {}))
                 self.sessions = ServerCollection(server_data.get("sessions", {}))
                 self.groups = ServerCollection(server_data.get("groups", {}))
+                self.loaded_data = True
     
     def save_on_file(self):
         logging.info("saving data on file system")
-        if C.STORE_DATA_ON_FILE_SYSTEM:
-            server_data = {
-                'messages': self.messages.get_dict(),
-                'sessions': self.sessions.get_dict(),
-                'groups': self.groups.get_dict(),
-            }
-            with open(C.DATA_STORE_FILE_PATH, 'w') as wf:
-                json.dump(server_data, wf)
+        try:
+            if C.STORE_DATA_ON_FILE_SYSTEM and self.loaded_data:
+                server_data = {
+                    'messages': self.messages.get_dict(),
+                    'sessions': self.sessions.get_dict(),
+                    'groups': self.groups.get_dict(),
+                }
+                with open(C.DATA_STORE_FILE_PATH, 'w') as wf:
+                    json.dump(server_data, wf)
+        except Exception as e:
+            pass
 
 
 # data_store = Datastore()
