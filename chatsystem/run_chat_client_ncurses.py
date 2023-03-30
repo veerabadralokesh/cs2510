@@ -405,6 +405,12 @@ def send_messages(post_message_queue, post_message_event):
             break
         post_message_event.clear()
 
+def get_server_view():
+    stub = state.get(C.STUB)
+    if stub:
+        server_status = stub.GetServerView(chat_system_pb2.BlankMessage())
+        display_manager.info(f'Current Server View: {server_status.statusMessage}')
+    pass
 
 def run():
     
@@ -490,6 +496,10 @@ def run():
                 post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
                 display_manager.info('')
             
+            elif command in C.GET_SERVER_VIEW_COMMANDS:
+                get_server_view()
+                pass
+
             else:
                 display_manager.error('Not a valid command!')
             

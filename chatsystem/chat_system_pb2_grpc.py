@@ -61,6 +61,11 @@ class ChatServerStub(object):
                 request_serializer=chat__system__pb2.Group.SerializeToString,
                 response_deserializer=chat__system__pb2.Message.FromString,
                 )
+        self.GetServerView = channel.unary_unary(
+                '/chatsystem.ChatServer/GetServerView',
+                request_serializer=chat__system__pb2.BlankMessage.SerializeToString,
+                response_deserializer=chat__system__pb2.Status.FromString,
+                )
 
 
 class ChatServerServicer(object):
@@ -122,6 +127,12 @@ class ChatServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetServerView(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ChatServerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -169,6 +180,11 @@ def add_ChatServerServicer_to_server(servicer, server):
                     servicer.SendMessagetoServer,
                     request_deserializer=chat__system__pb2.Group.FromString,
                     response_serializer=chat__system__pb2.Message.SerializeToString,
+            ),
+            'GetServerView': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetServerView,
+                    request_deserializer=chat__system__pb2.BlankMessage.FromString,
+                    response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -332,5 +348,22 @@ class ChatServer(object):
         return grpc.experimental.unary_stream(request, target, '/chatsystem.ChatServer/SendMessagetoServer',
             chat__system__pb2.Group.SerializeToString,
             chat__system__pb2.Message.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetServerView(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/GetServerView',
+            chat__system__pb2.BlankMessage.SerializeToString,
+            chat__system__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

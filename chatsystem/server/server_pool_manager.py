@@ -59,6 +59,10 @@ class ServerPoolManager:
                              daemon=True, 
                              args=[self.active_stubs, self.num_servers, self.id])
         t.start()
+    
+    def get_connected_servers_view(self):
+        return sorted(self.active_stubs.keys())
+
 
 def join_server(server_string):
     print(f"Trying to connect to server: {server_string}")

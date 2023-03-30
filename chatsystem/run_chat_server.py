@@ -140,6 +140,13 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
 
+    def GetServerView(self, request, context):
+        status = chat_system_pb2.Status(
+            status=True, 
+            statusMessage = ", ".join(list(map(str, self.spm.get_connected_servers_view())))
+            )
+        return status
+    
     def SendMessagetoServer(self):
         # whenever new message comes from client,
         # send it to all connected servers
