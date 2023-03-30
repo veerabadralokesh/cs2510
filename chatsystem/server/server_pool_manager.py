@@ -63,6 +63,22 @@ class ServerPoolManager:
     def get_connected_servers_view(self):
         return sorted(self.active_stubs.keys())
 
+    def send_msg_to_connected_servers(self, message, event_type=C.MESSAGE_EVENT):
+        server_message = chat_system_pb2.ServerMessage(
+            group_id=message.get('group_id'),
+            user_id=message.get('user_id'),
+            creation_time=message.get('creation_time'),
+            text=message.get('text'),
+            message_id=message.get('message_id'),
+            likes=message.get('likes'),
+            message_type=message.get('message_type'),
+            vector_timestamp =message.get('vector_timestamp'),
+            event_type=event_type,
+            users=message.get('users')
+        )
+        for key in self.active_stubs.keys():
+            self.active_stubs[key].SyncMessagetoServer(server_message)
+        pass
 
 def join_server(server_string):
     print(f"Trying to connect to server: {server_string}")

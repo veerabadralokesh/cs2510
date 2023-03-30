@@ -66,7 +66,7 @@ def check_state(check_point):
 def exit_group(user_id, group_id):
     stub=state.get(C.STUB)
     stub.ExitGroup(chat_system_pb2.Group(
-        group_id=group_id, user_id=user_id))
+        group_id=group_id, user_id=user_id, session_id=state.get(C.SESSION_ID)))
     display_manager.info(
         f"{user_id} successfully exited group {group_id}")
     state[C.ACTIVE_GROUP_KEY] = None

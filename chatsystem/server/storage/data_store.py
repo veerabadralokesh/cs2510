@@ -79,6 +79,8 @@ class Datastore(DataManager):
                         return
                     original_message["likes"][key] = val
                 self.groups[group_id]["updated_ids"].append(message_id)
+        
+        return message
             
     def save_session_info(self, session_id, user_id, group_id=None, is_active=True, context=None):
         session = {
@@ -128,27 +130,28 @@ class Datastore(DataManager):
     def get_group(self, group_id):
         return self.groups.get(group_id)
     
-    def create_group(self, group_id):
+    def create_group(self, group_id, users=[], creation_time=get_timestamp()):
         group = {
             'group_id': group_id,
-            'users': [],
+            'users': users,
             'message_ids': [],
-            'creation_time': get_timestamp(),
+            'creation_time': creation_time,
             'updated_ids': []
         }
         self.groups[group_id] = group
         logging.info(f"Group {group_id} created")
+        return group
 
     def add_user_to_group(self, group_id, user_id):
         # print("inside add_user_to_group group id", group_id, "users", user_id)
         self.groups[group_id]['users'].append(user_id)
         logging.info(f"{user_id} joined {group_id}")
-        self.save_message({"group_id": group_id, 
-        "user_id": user_id,
-        "creation_time": get_timestamp(),
-        "message_id": get_unique_id(),
-        "text":[],
-        "message_type": C.USER_JOIN})
+        # self.save_message({"group_id": group_id, 
+        # "user_id": user_id,
+        # "creation_time": get_timestamp(),
+        # "message_id": get_unique_id(),
+        # "text":[],
+        # "message_type": C.USER_JOIN})
     
     def remove_user_from_group(self, group_id, user_id):
         if user_id not in self.groups[group_id]['users']:
@@ -156,12 +159,6 @@ class Datastore(DataManager):
         index = self.groups[group_id]['users'].index(user_id)
         del self.groups[group_id]['users'][index]
         logging.info(f"{user_id} removed from {group_id}")
-        self.save_message({"group_id": group_id, 
-        "user_id": user_id,
-        "creation_time": get_timestamp(),
-        "message_id": get_unique_id(),
-        "text":[],
-        "message_type": C.USER_LEFT})
 
     def __del__(self):
         self.save_on_file()
@@ -176,6 +173,10 @@ class Datastore(DataManager):
                 self.groups = ServerCollection(server_data.get("groups", {}))
                 self.loaded_data = True
     
+    def save_msg_to_disk(self):
+
+        pass
+
     def save_on_file(self):
         logging.info("saving data on file system")
         try:

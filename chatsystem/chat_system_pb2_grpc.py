@@ -56,10 +56,10 @@ class ChatServerStub(object):
                 request_serializer=chat__system__pb2.ActiveSession.SerializeToString,
                 response_deserializer=chat__system__pb2.Status.FromString,
                 )
-        self.SendMessagetoServer = channel.unary_stream(
-                '/chatsystem.ChatServer/SendMessagetoServer',
-                request_serializer=chat__system__pb2.Group.SerializeToString,
-                response_deserializer=chat__system__pb2.Message.FromString,
+        self.SyncMessagetoServer = channel.unary_unary(
+                '/chatsystem.ChatServer/SyncMessagetoServer',
+                request_serializer=chat__system__pb2.ServerMessage.SerializeToString,
+                response_deserializer=chat__system__pb2.Status.FromString,
                 )
         self.GetServerView = channel.unary_unary(
                 '/chatsystem.ChatServer/GetServerView',
@@ -121,7 +121,7 @@ class ChatServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SendMessagetoServer(self, request, context):
+    def SyncMessagetoServer(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -176,10 +176,10 @@ def add_ChatServerServicer_to_server(servicer, server):
                     request_deserializer=chat__system__pb2.ActiveSession.FromString,
                     response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
-            'SendMessagetoServer': grpc.unary_stream_rpc_method_handler(
-                    servicer.SendMessagetoServer,
-                    request_deserializer=chat__system__pb2.Group.FromString,
-                    response_serializer=chat__system__pb2.Message.SerializeToString,
+            'SyncMessagetoServer': grpc.unary_unary_rpc_method_handler(
+                    servicer.SyncMessagetoServer,
+                    request_deserializer=chat__system__pb2.ServerMessage.FromString,
+                    response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
             'GetServerView': grpc.unary_unary_rpc_method_handler(
                     servicer.GetServerView,
@@ -335,7 +335,7 @@ class ChatServer(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def SendMessagetoServer(request,
+    def SyncMessagetoServer(request,
             target,
             options=(),
             channel_credentials=None,
@@ -345,9 +345,9 @@ class ChatServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/chatsystem.ChatServer/SendMessagetoServer',
-            chat__system__pb2.Group.SerializeToString,
-            chat__system__pb2.Message.FromString,
+        return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/SyncMessagetoServer',
+            chat__system__pb2.ServerMessage.SerializeToString,
+            chat__system__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

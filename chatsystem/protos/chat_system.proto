@@ -25,7 +25,7 @@ service ChatServer {
 
     rpc HealthCheck(stream ActiveSession) returns (Status) {}
 
-    rpc SendMessagetoServer(Group) returns (stream Message) {}
+    rpc SyncMessagetoServer(ServerMessage) returns (Status) {}
 
     rpc GetServerView(BlankMessage) returns (Status) {} 
 }
@@ -68,4 +68,17 @@ message Message {
     string message_id = 5;
     map<string, int32> likes = 7;
     string message_type = 6;
+}
+
+message ServerMessage {
+    string group_id = 1;
+    string user_id = 2;
+    uint64 creation_time = 3;
+    repeated string text = 4;
+    string message_id = 5;
+    map<string, int32> likes = 7;
+    string message_type = 6;
+    repeated int32 vector_timestamp = 8;
+    string event_type = 9;
+    repeated string users = 10;
 }
