@@ -38,7 +38,7 @@ class ServerCollection():
 
 class Datastore(DataManager):
 
-    def __init__(self, messages={}, users={}, groups={}) -> None:
+    def __init__(self, file_manager, messages={}, users={}, groups={}) -> None:
         # messages = {message_object, }
         super().__init__()
         self._lock = threading.Lock()
@@ -46,6 +46,7 @@ class Datastore(DataManager):
         self.sessions = ServerCollection(users)
         self.groups = ServerCollection(groups)
         self.loaded_data = False
+        self.file_manager = file_manager
         self.load_from_file()
 
     def save_message(self, message):

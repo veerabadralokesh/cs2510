@@ -48,11 +48,12 @@ def connect_to_servers(active_stubs, num_servers, id):
         sleep(C.CONNECT_SERVER_INTERVAL)
 
 class ServerPoolManager:
-    def __init__(self, id) -> None:
+    def __init__(self, id, file_manager) -> None:
         """
         id: id of current server
         """
         self.id = id
+        self.file_manager = file_manager
         self.num_servers = 5
         self.active_stubs = {}
         t = threading.Thread(target=connect_to_servers, 
