@@ -1,5 +1,6 @@
 FROM ubuntu:latest
 ENV DEBIAN_FRONTEND noninteractive
+ENV USE_DIFFERENT_PORTS 0
 
 RUN apt update && apt install -y make gcc vim python3 python3-pip
 
