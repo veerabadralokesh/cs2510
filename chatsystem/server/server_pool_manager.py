@@ -82,7 +82,7 @@ class ServerPoolManager:
         pass
 
 def join_server(server_string):
-    print(f"Trying to connect to server: {server_string}")
+    # print(f"Trying to connect to server: {server_string}")
     channel = grpc.insecure_channel(server_string)
     stub = chat_system_pb2_grpc.ChatServerStub(channel)
     server_status = stub.Ping(chat_system_pb2.BlankMessage())

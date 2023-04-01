@@ -221,6 +221,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             users = message.get('users', [])
             creation_time = message.get('creation_time')
             if not self.data_store.get_group(group_id):
+                # print(f'creating group {group_id}')
                 self.data_store.create_group(group_id, users, creation_time)
         return status
 
@@ -254,8 +255,9 @@ def serve():
         
         server.wait_for_termination()
     finally:
-        if data_store is not None:
-            data_store.save_on_file()
+        pass
+        # if data_store is not None:
+            # data_store.save_on_file()
 
 
 if __name__ == '__main__':

@@ -6,6 +6,7 @@ import logging
 import copy
 import server.constants as C
 from server.storage.data_manager import DataManager
+from server.storage.file_manager import FileManager
 from server.storage.utils import is_valid_message, get_timestamp, get_unique_id
 
 class ServerCollection():
@@ -38,7 +39,7 @@ class ServerCollection():
 
 class Datastore(DataManager):
 
-    def __init__(self, file_manager, messages={}, users={}, groups={}) -> None:
+    def __init__(self, file_manager: FileManager, messages={}, users={}, groups={}) -> None:
         # messages = {message_object, }
         super().__init__()
         self._lock = threading.Lock()
@@ -47,7 +48,7 @@ class Datastore(DataManager):
         self.groups = ServerCollection(groups)
         self.loaded_data = False
         self.file_manager = file_manager
-        self.load_from_file()
+        self.recover_data_from_disk()
 
     def save_message(self, message):
         """
@@ -63,14 +64,17 @@ class Datastore(DataManager):
             with self._lock:
                 self.messages[message_id] = message
                 message["likes"] = {}
+                # if group_id not in self.groups:
+                #     self.create_group(group_id)
                 self.groups[group_id]["message_ids"].append(message_id)
+                self.file_manager.append(f'{group_id}_messages.txt', message)
 
-        elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
-            with self._lock:
-                original_message = self.messages[message_id]
-                original_message["text"].extend(message["text"])
-                self.groups[group_id]["updated_ids"].append(message_id)
-        
+        # elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
+        #     with self._lock:
+        #         original_message = self.messages[message_id]
+        #         original_message["text"].extend(message["text"])
+        #         self.groups[group_id]["updated_ids"].append(message_id)
+        #         self.file_manager.append(f'{group_id}_messages.txt', original_message)
         else:
             # like / unlike message_type
             with self._lock:
@@ -80,7 +84,8 @@ class Datastore(DataManager):
                         return
                     original_message["likes"][key] = val
                 self.groups[group_id]["updated_ids"].append(message_id)
-        
+                self.file_manager.append(f'{group_id}_messages.txt', original_message)
+
         return message
             
     def save_session_info(self, session_id, user_id, group_id=None, is_active=True, context=None):
@@ -141,6 +146,7 @@ class Datastore(DataManager):
         }
         self.groups[group_id] = group
         logging.info(f"Group {group_id} created")
+        self.file_manager.write(f'{group_id}.json', group)
         return group
 
     def add_user_to_group(self, group_id, user_id):
@@ -161,36 +167,55 @@ class Datastore(DataManager):
         del self.groups[group_id]['users'][index]
         logging.info(f"{user_id} removed from {group_id}")
 
-    def __del__(self):
-        self.save_on_file()
-    
-    def load_from_file(self):
-        logging.info('loading data from file system')
-        if C.STORE_DATA_ON_FILE_SYSTEM and os.path.isfile(C.DATA_STORE_FILE_PATH):
-            with open(C.DATA_STORE_FILE_PATH) as rf:
-                server_data = json.load(rf)
-                self.messages = ServerCollection(server_data.get("messages", {}))
-                self.sessions = ServerCollection(server_data.get("sessions", {}))
-                self.groups = ServerCollection(server_data.get("groups", {}))
-                self.loaded_data = True
-    
-    def save_msg_to_disk(self):
+    def recover_data_from_disk(self):
+        all_files = self.file_manager.list_files()
+        json_files = [f for f in all_files if f.endswith('.json')]
+        for file in json_files:
+            group_data = json.loads(self.file_manager.read(file))
+            self.groups[group_data['group_id']] = group_data
 
-        pass
+        txt_files = [f for f in all_files if f.endswith('.txt')]
+        for file in txt_files:
+            messages = self.file_manager.read(file).split('\n')
+            message_ids = {}
+            for message in messages:
+                try:
+                    message_data = json.loads(message)
+                    message_id = message_data['message_id']
+                    group_id = message_data['group_id']
+                    if message_id not in message_ids:
+                        message_ids[message_id] = 1
+                        self.groups[group_id]['message_ids'].append(message_id)
+                    self.messages[message_id] = message_data
+                except json.decoder.JSONDecodeError:
+                    pass
 
-    def save_on_file(self):
-        logging.info("saving data on file system")
-        try:
-            if C.STORE_DATA_ON_FILE_SYSTEM and self.loaded_data:
-                server_data = {
-                    'messages': self.messages.get_dict(),
-                    'sessions': self.sessions.get_dict(),
-                    'groups': self.groups.get_dict(),
-                }
-                with open(C.DATA_STORE_FILE_PATH, 'w') as wf:
-                    json.dump(server_data, wf)
-        except Exception as e:
-            pass
+    # def __del__(self):
+    #     self.save_on_file()
+    
+    # def load_from_file(self):
+    #     logging.info('loading data from file system')
+    #     if C.STORE_DATA_ON_FILE_SYSTEM and os.path.isfile(C.DATA_STORE_FILE_PATH):
+    #         with open(C.DATA_STORE_FILE_PATH) as rf:
+    #             server_data = json.load(rf)
+    #             self.messages = ServerCollection(server_data.get("messages", {}))
+    #             self.sessions = ServerCollection(server_data.get("sessions", {}))
+    #             self.groups = ServerCollection(server_data.get("groups", {}))
+    #             self.loaded_data = True
+
+    # def save_on_file(self):
+    #     logging.info("saving data on file system")
+    #     try:
+    #         if C.STORE_DATA_ON_FILE_SYSTEM and self.loaded_data:
+    #             server_data = {
+    #                 'messages': self.messages.get_dict(),
+    #                 'sessions': self.sessions.get_dict(),
+    #                 'groups': self.groups.get_dict(),
+    #             }
+    #             with open(C.DATA_STORE_FILE_PATH, 'w') as wf:
+    #                 json.dump(server_data, wf)
+    #     except Exception as e:
+    #         pass
 
 
 # data_store = Datastore()
