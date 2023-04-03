@@ -92,8 +92,9 @@ class ServerPoolManager:
                                 status = stub.SyncMessagetoServer(server_message)
                                 if status.status:
                                     message_queue.get(0)
-                            except:
-                                pass
+                            except Exception as e:
+                                print(e)
+                                break
 
                         message_event.wait()
                         message_event.clear()
