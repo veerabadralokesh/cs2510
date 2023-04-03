@@ -68,10 +68,12 @@ class ServerPoolManager:
                     server_string = C.SERVER_STRING.format(server_id)
                 stub = join_server(server_string)
                 if stub:
+                    # connected to server
                     self.active_stubs[server_id] = stub
                     message_queue = self.message_queues[server_id]
                     message_event = self.thread_events[server_id]
                     while True:
+                        # wait for new messages loaded in queue
                         while message_queue.qsize():
                             message = message_queue.queue[0]
                             server_message = chat_system_pb2.ServerMessage(
@@ -87,8 +89,9 @@ class ServerPoolManager:
                                 users=message.get('users')
                             )
                             try:
-                                stub.SyncMessagetoServer(server_message)
-                                message_queue.get(0)
+                                status = stub.SyncMessagetoServer(server_message)
+                                if status.status:
+                                    message_queue.get(0)
                             except:
                                 pass
 
@@ -124,8 +127,11 @@ class ServerPoolManager:
         return sorted(self.active_stubs.keys())
 
     def send_msg_to_connected_servers(self, message, event_type=C.MESSAGE_EVENT):
-
         message['event_type'] = event_type
-        
-        pass
+        for i in range(1, self.num_servers + 1):
+            # try:
+            if self.id == i: 
+                continue
+            self.message_queues[i].put(message)
+            self.thread_events[i].set()
 
