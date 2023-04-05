@@ -9,4 +9,6 @@ COPY . /opt/docker/
 
 RUN python3 -m pip install -r requirements.txt
 
+RUN g++ chat_server.cpp -o chat_server
+
 CMD bash
