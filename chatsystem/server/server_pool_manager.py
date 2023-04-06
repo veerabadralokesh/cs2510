@@ -32,17 +32,18 @@ class ServerState:
         return self._state
 
 
-def join_server(server_string):
+def join_server(server_string, server_id):
     try:
         # print(f"Trying to connect to server: {server_string}")
         channel = grpc.insecure_channel(server_string)
         stub = chat_system_pb2_grpc.ChatServerStub(channel)
-        server_status = stub.Ping(chat_system_pb2.BlankMessage())
+        server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=server_id))
         if server_status.status is True:
             print(f"Connected to server: {server_string}")
             return stub
             # sleep(C.CONNECT_SERVER_INTERVAL)
-    except:
+    except Exception as e:
+        # print("exception: ", e)
         pass
 
 class ServerPoolManager:
@@ -60,18 +61,26 @@ class ServerPoolManager:
     
 
     def keep_alive_sync(self, server_id):
+        """
+        triggered for each server
+        joins server
+        waits for message events
+        when there is new message -> reads message queue -> sends message to connected servers
+        when connection drops (2nd server crash), it removes stub and checks for new connection 
+        """
         try:
             while True:
                 if C.USE_DIFFERENT_PORTS:
                     server_string = f'localhost:{(11999+server_id)}'
                 else:
                     server_string = C.SERVER_STRING.format(server_id)
-                stub = join_server(server_string)
+                stub = join_server(server_string, self.id)
                 if stub:
                     # connected to server
                     self.active_stubs[server_id] = stub
                     message_queue = self.message_queues[server_id]
                     message_event = self.thread_events[server_id]
+
                     while True:
                         # wait for new messages loaded in queue
                         while message_queue.qsize():
@@ -92,10 +101,16 @@ class ServerPoolManager:
                                 status = stub.SyncMessagetoServer(server_message)
                                 if status.status:
                                     message_queue.get(0)
+                            except grpc.RpcError as er:
+                                del self.active_stubs[server_id]
+                                stub = None
+                                break
                             except Exception as e:
                                 print(e)
                                 break
-
+                        if stub is None:
+                            # if stub is None, don't wait for new messages
+                            break
                         message_event.wait()
                         message_event.clear()
 
@@ -104,6 +119,10 @@ class ServerPoolManager:
         finally:
             if server_id in self.active_stubs:
                 del self.active_stubs[server_id]
+        pass
+
+    def send_msg_to_recovered_servers(self, recovered_server_id):
+        self.thread_events[recovered_server_id].set()
         pass
 
     def connect_to_servers(self):

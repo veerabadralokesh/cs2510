@@ -186,6 +186,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         return status
     
     def Ping(self, request, context):
+        server_id = request.server_id
+        self.spm.send_msg_to_recovered_servers(server_id)
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
 

@@ -186,11 +186,11 @@ def get_messages(change_group_event):
 
 
 def join_server(server_string):
-    if server_string == state.get(C.SERVER_CONNECTION_STRING):
+    if server_string == state.get(C.SERVER_CONNECTION_STRING) and state.get(C.SERVER_ONLINE):
         display_manager.info(f'Already connected to server {server_string}')
         return state.get(C.STUB)
     channel = state.get(C.ACTIVE_CHANNEL)
-    if channel:
+    if channel and state.get(C.SERVER_ONLINE):
         close_connection(channel)
     display_manager.info(f"Trying to connect to server: {server_string}")
     channel = grpc.insecure_channel(server_string)
@@ -202,6 +202,7 @@ def join_server(server_string):
     state[C.SERVER_ONLINE] = True
     state[C.SERVER_CONNECTION_STRING] = server_string
     state[C.STUB] = stub
+    # state[C.ACTIVE_GROUP_KEY] = None
     return stub
 
 

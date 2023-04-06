@@ -21,7 +21,7 @@ service ChatServer {
 
     rpc PostMessage(Message) returns (Status) {}
 
-    rpc Ping(BlankMessage) returns (Status) {}
+    rpc Ping(PingMessage) returns (Status) {}
 
     rpc HealthCheck(stream ActiveSession) returns (Status) {}
 
@@ -31,6 +31,10 @@ service ChatServer {
 }
 
 message BlankMessage {}
+
+message PingMessage {
+    int32 server_id = 1;
+}
 
 message ActiveSession {
     string session_id = 1;

@@ -48,7 +48,7 @@ class ChatServerStub(object):
                 )
         self.Ping = channel.unary_unary(
                 '/chatsystem.ChatServer/Ping',
-                request_serializer=chat__system__pb2.BlankMessage.SerializeToString,
+                request_serializer=chat__system__pb2.PingMessage.SerializeToString,
                 response_deserializer=chat__system__pb2.Status.FromString,
                 )
         self.HealthCheck = channel.stream_unary(
@@ -168,7 +168,7 @@ def add_ChatServerServicer_to_server(servicer, server):
             ),
             'Ping': grpc.unary_unary_rpc_method_handler(
                     servicer.Ping,
-                    request_deserializer=chat__system__pb2.BlankMessage.FromString,
+                    request_deserializer=chat__system__pb2.PingMessage.FromString,
                     response_serializer=chat__system__pb2.Status.SerializeToString,
             ),
             'HealthCheck': grpc.stream_unary_rpc_method_handler(
@@ -312,7 +312,7 @@ class ChatServer(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/chatsystem.ChatServer/Ping',
-            chat__system__pb2.BlankMessage.SerializeToString,
+            chat__system__pb2.PingMessage.SerializeToString,
             chat__system__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
