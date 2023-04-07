@@ -130,6 +130,8 @@ def health_check():
                 state[C.SERVER_ONLINE] = False
         except Exception as ex:
             state[C.SERVER_ONLINE] = False
+            state[C.ACTIVE_GROUP_KEY] = None
+            state[C.ACTIVE_USER_KEY] = None
             display_manager.warn('server disconnected')
         # sleep(C.HEALTH_CHECK_INTERVAL)
         state['user_joined_event'].wait()

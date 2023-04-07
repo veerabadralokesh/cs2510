@@ -1,13 +1,15 @@
+import json
 import threading
 from time import sleep
 import grpc
 import chat_system_pb2
 import chat_system_pb2_grpc
 import server.constants as C
+from server.storage.utils import get_timestamp
 from queue import Queue
 
 
-class ServerState:
+class ThreadSafeDict:
     def __init__(self, initial={}):
         self._lock = threading.Lock()
         self._state = initial
@@ -17,7 +19,8 @@ class ServerState:
             self._state[key] = value
 
     def __getitem__(self, key):
-        return self._state[key]
+        with self._lock:
+            return self._state[key]
 
     def __contains__(self, key):
         return (key in self._state)
@@ -30,6 +33,10 @@ class ServerState:
     
     def get_dict(self):
         return self._state
+    
+    def values(self):
+        with self._lock:
+            return self._state.values()
 
 
 def join_server(server_string, server_id):
@@ -58,6 +65,10 @@ class ServerPoolManager:
         self.thread_events = {}
         self.message_queues = {}
         self.connect_to_servers()
+        self.delete_timestamp_queue = Queue()
+        self.message_timestamp_lock = threading.Lock()
+        self.queue_timestamp_dict = ThreadSafeDict()
+        
     
 
     def keep_alive_sync(self, server_id):
@@ -82,9 +93,10 @@ class ServerPoolManager:
                     message_event = self.thread_events[server_id]
 
                     while True:
-                        # wait for new messages loaded in queue
                         while message_queue.qsize():
-                            message = message_queue.queue[0]
+                            queue_message = message_queue.queue[0]
+                            timestamp, message = queue_message
+                            
                             server_message = chat_system_pb2.ServerMessage(
                                 group_id=message.get('group_id'),
                                 user_id=message.get('user_id'),
@@ -101,6 +113,8 @@ class ServerPoolManager:
                                 status = stub.SyncMessagetoServer(server_message)
                                 if status.status:
                                     message_queue.get(0)
+                                    self.queue_timestamp_dict[server_id] = timestamp
+
                             except grpc.RpcError as er:
                                 del self.active_stubs[server_id]
                                 stub = None
@@ -136,22 +150,50 @@ class ServerPoolManager:
                     continue
                 self.thread_events[i] = threading.Event()
                 self.message_queues[i] = Queue()
+                self.queue_timestamp_dict[i] = 0
                 t = threading.Thread(target=self.keep_alive_sync, 
-                            daemon=True, 
-                            args=[i])
+                                     daemon=True, 
+                                     args=[i])
                 t.start()
             except Exception:
                 pass
+        try:
+            t = threading.Thread(target=self.delete_queue_messages,
+                                 daemon=True)
+            t.start()
+        except Exception as e:
+            print(f'Error in thread delete_queue_messages: {e}')
+        
     
     def get_connected_servers_view(self):
         return sorted(self.active_stubs.keys())
+    
+    def get_unique_timestamp(self):
+        with self.message_timestamp_lock:
+            return get_timestamp()
+        
+    def delete_queue_messages(self):
+        while True:
+            min_timestamp = min(self.queue_timestamp_dict.values())
+            while self.delete_timestamp_queue.qsize():
+                timestamp = self.delete_timestamp_queue.queue[0]
+                if min_timestamp >= timestamp:
+                    self.file_manager.delete_file(str(timestamp), fast=True)
+                    self.delete_timestamp_queue.get(0)
+                else:
+                    break
+            sleep(C.DELETE_MESSAGE_FROM_DISK_INTERVAL)
 
     def send_msg_to_connected_servers(self, message, event_type=C.MESSAGE_EVENT):
+        timestamp = self.get_unique_timestamp()
+        queue_object = (timestamp, message)
         message['event_type'] = event_type
         for i in range(1, self.num_servers + 1):
             # try:
             if self.id == i: 
                 continue
-            self.message_queues[i].put(message)
+            self.message_queues[i].put(queue_object)
             self.thread_events[i].set()
-
+        self.delete_timestamp_queue.put(timestamp)
+        file_name = str(timestamp)
+        self.file_manager.fast_write(file_name, json.dumps(message).encode('utf-8'))

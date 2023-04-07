@@ -14,6 +14,9 @@ def get_timestamp() -> int:
     return int(datetime.now().timestamp() * 1_000_000)
 
 
+def get_monotonically_increasing_timestamp():
+    
+    pass
 
 def is_valid_message(message):
     
