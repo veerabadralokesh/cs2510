@@ -6,7 +6,7 @@ class FileManager:
     def __init__(self, root) -> None:
         self.root = root
         self.fast_root = os.path.join(root, "cache")
-        os.makedirs(self.root, exist_ok=True)
+        os.makedirs(self.fast_root, exist_ok=True)
     
     def write(self, file, message):
         if isinstance(message, dict):
@@ -17,6 +17,7 @@ class FileManager:
     
     def fast_write(self, file, message: bytes):
         try:
+            print("in fast_write", message)
             path = os.path.join(self.fast_root, file)
             file_desc = os.open(path, os.O_RDWR | os.O_CREAT)
             os.write(file_desc, message)     
@@ -68,5 +69,5 @@ class FileManager:
     
     def list_files(self, fast=False):
         if fast:
-            return os.fast_root
+            return os.listdir(self.fast_root)
         return os.listdir(self.root)
