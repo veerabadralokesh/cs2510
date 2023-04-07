@@ -73,7 +73,7 @@ def check_state(check_point):
 def exit_group(user_id, group_id):
     stub=state.get(C.STUB)
     stub.ExitGroup(chat_system_pb2.Group(
-        group_id=group_id, user_id=user_id))
+        group_id=group_id, user_id=user_id, session_id=state.get(C.SESSION_ID)))
     display_manager.info(
         f"{user_id} successfully exited group {group_id}")
     display_manager.write_header(group_name="",participants="")
@@ -139,6 +139,8 @@ def health_check():
                 state[C.SERVER_ONLINE] = False
         except Exception as ex:
             state[C.SERVER_ONLINE] = False
+            state[C.ACTIVE_GROUP_KEY] = None
+            state[C.ACTIVE_USER_KEY] = None
             display_manager.warn('server disconnected')
         # sleep(C.HEALTH_CHECK_INTERVAL)
         state['user_joined_event'].wait()
@@ -225,23 +227,23 @@ def get_messages(change_group_event):
 
 
 def join_server(server_string):
-
-    if server_string == state.get(C.SERVER_CONNECTION_STRING):
+    if server_string == state.get(C.SERVER_CONNECTION_STRING) and state.get(C.SERVER_ONLINE):
         display_manager.info(f'Already connected to server {server_string}')
         return state.get(C.STUB)
     channel = state.get(C.ACTIVE_CHANNEL)
-    if channel:
+    if channel and state.get(C.SERVER_ONLINE):
         close_connection(channel)
     display_manager.info(f"Trying to connect to server: {server_string}")
     channel = grpc.insecure_channel(server_string)
     stub = chat_system_pb2_grpc.ChatServerStub(channel)
-    server_status = stub.HealthCheck(chat_system_pb2.ActiveSession(session_id=None))
-    if server_status.status is True:
-        display_manager.info("Server connection active")
-        state[C.ACTIVE_CHANNEL] = channel
-        state[C.SERVER_ONLINE] = True
-        state[C.SERVER_CONNECTION_STRING] = server_string
-        state[C.STUB] = stub
+    # server_status = stub.HealthCheck(chat_system_pb2.ActiveSession(session_id=None))
+    # if server_status.status is True:
+    display_manager.info("Server connection active")
+    state[C.ACTIVE_CHANNEL] = channel
+    state[C.SERVER_ONLINE] = True
+    state[C.SERVER_CONNECTION_STRING] = server_string
+    state[C.STUB] = stub
+    # state[C.ACTIVE_GROUP_KEY] = None
     return stub
 
 
