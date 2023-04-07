@@ -1,6 +1,8 @@
 
 import os
 
+NUM_SERVERS = 5
+
 STORE_DATA_ON_FILE_SYSTEM = True
 
 DATA_STORE_FILE_DIR_PATH = os.path.join(os.path.expanduser('~'), 'data', 'chat_server{}')

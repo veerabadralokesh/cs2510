@@ -19,12 +19,13 @@ from server.server_pool_manager import ServerPoolManager
 
 class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
-    def __init__(self, data_store: Datastore, spm: ServerPoolManager, file_manager: FileManager) -> None:
+    def __init__(self, data_store: Datastore, spm: ServerPoolManager, file_manager: FileManager, server_id) -> None:
         super().__init__()
         self.data_store = data_store
         self.new_message_event = threading.Event()
         self.spm = spm
         self.file_manager = file_manager
+        self.server_id = server_id
         pass
 
     def get_group_details(self, group_id: str, user_id: str) -> chat_system_pb2.GroupDetails:
@@ -150,6 +151,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
 
     def new_message(self, message):
+        message['vector_timestamp'] = self.spm.update_vector_timestamp()
+        
         server_message = self.data_store.save_message(message)
         self.spm.send_msg_to_connected_servers(server_message)
         self.new_message_event.set()
@@ -182,7 +185,6 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                     self.data_store.remove_user_from_group(group_id, user_id)
                     self.data_store.save_session_info(session_id, user_id, is_active=False)
                     self.new_message_event.set()
-            pass
         return status
     
     def Ping(self, request, context):
@@ -197,7 +199,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             statusMessage = ", ".join(list(map(str, self.spm.get_connected_servers_view())))
             )
         return status
-    
+
     def SyncMessagetoServer(self, request, context):
         """getting messages from other servers"""
         # whenever new message comes from client,
@@ -209,6 +211,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         message_type = message.get('message_type')
         group_id = message.get('group_id')
         user_id = message.get('user_id')
+
+        self.spm.update_vector_timestamp(message)
 
         if event_type == C.MESSAGE_EVENT:
             # add vector timestamp to message
@@ -244,7 +248,7 @@ def serve():
         spm = ServerPoolManager(args.id, file_manager)
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10000))
         chat_system_pb2_grpc.add_ChatServerServicer_to_server(
-            ChatServerServicer(data_store, spm, file_manager), server
+            ChatServerServicer(data_store, spm, file_manager, args.id), server
         )
         if C.USE_DIFFERENT_PORTS:
             id = args.id

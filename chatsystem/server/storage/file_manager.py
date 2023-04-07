@@ -17,7 +17,6 @@ class FileManager:
     
     def fast_write(self, file, message: bytes):
         try:
-            print("in fast_write", message)
             path = os.path.join(self.fast_root, file)
             file_desc = os.open(path, os.O_RDWR | os.O_CREAT)
             os.write(file_desc, message)     

@@ -49,6 +49,45 @@ class Datastore(DataManager):
         self.loaded_data = False
         self.file_manager = file_manager
         self.recover_data_from_disk()
+        self.reorder_messages()
+
+    def compare_timestamps(self, message1, message2):
+        server1 = message1.get('server_id')
+        server2 = message2.get('server_id')
+        timestamp1 = message1.get('vector_timestamp')
+        timestamp2 = message2.get('vector_timestamp')
+        comparison_dict = {"less":0, "greater":0, "equal":0}
+        for key in timestamp1:
+            if timestamp1[key] < timestamp2[key]:
+                comparison_dict["less"] += 1
+            elif timestamp1[key] > timestamp2[key]:
+                comparison_dict["greater"] += 1
+            else:
+                comparison_dict["equal"] += 1
+        if comparison_dict["less"] > 0 and comparison_dict["greater"] == 0:
+            return 0 # return (message1, message2)
+        if comparison_dict["less"] == 0 and comparison_dict["greater"] > 0:
+            return 1 # return (message2, message1)
+        if server1 < server2:
+            return 0 # return (message1, message2)
+        return 1 #(message2, message1)
+
+    def binary_search(self, message_list, new_message):
+        left = 0
+        right = len(message_list)-1
+        while left < right:
+            mid = (left + right)//2
+            greater = self.compare_timestamps(new_message, message_list[mid])
+            if greater == 0:
+                right = mid
+            elif greater == 1:
+                left = mid + 1
+        
+        return left
+        
+    def reorder_messages():
+        binary_search(message_list, message)
+        pass
 
     def save_message(self, message):
         """

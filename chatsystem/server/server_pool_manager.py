@@ -65,14 +65,25 @@ class ServerPoolManager:
         self.active_stubs = {}
         self.thread_events = {}
         self.message_queues = {}
+        self.vector_timestamp = {i: 0 for i in range(1, C.NUM_SERVERS+1)}
         self.delete_timestamp_queue = Queue()
+        self.vector_timestamp_lock = threading.Lock()
         self.message_timestamp_lock = threading.Lock()
         self.queue_timestamp_dict = ThreadSafeDict()
         self.create_message_queues()
         self.load_queue_messages_from_disk()
         self.connect_to_servers()
         
-    
+    def update_vector_timestamp(self, message=None):
+        with self.vector_timestamp_lock:
+            if message:
+                for key in self.vector_timestamp:
+                    self.vector_timestamp[key] = max(self.vector_timestamp[key], message.get('vector_timestamp')[key])
+                # self.vector_timestamp = list(map(max, zip(self.vector_timestamp, message.get('vector_timestamp'))))
+            self.vector_timestamp[self.id] += 1
+            self.file_manager.fast_write(f"{self.id}_vector_timestamp", json.dumps(self.vector_timestamp).encode('utf-8'))
+            if not message:
+                return self.vector_timestamp.copy()
 
     def keep_alive_sync(self, server_id):
         """
@@ -110,14 +121,14 @@ class ServerPoolManager:
                                 message_type=message.get('message_type'),
                                 vector_timestamp =message.get('vector_timestamp'),
                                 event_type=message.get('event_type'),
-                                users=message.get('users')
+                                users=message.get('users'),
+                                server_id=message.get('server_id', self.id),
                             )
                             try:
                                 status = stub.SyncMessagetoServer(server_message)
                                 if status.status:
                                     message_queue.get(0)
                                     self.queue_timestamp_dict[server_id] = timestamp
-                                    print("here 1")
                                     if timestamp:
                                         self.file_manager.fast_write(f"{server_id}_last_sent_timestamp", json.dumps(timestamp).encode('utf-8'))
 
@@ -201,15 +212,17 @@ class ServerPoolManager:
 
         for file in queue_msg_files:
             if file.endswith('_last_sent_timestamp'):
-                print("FILE", file)
                 lines = self.file_manager.fast_read(file)
-                print("lines",lines)
                 last_sent_timestamp = json.loads(lines)
                 server_id = int(file.split("_")[0])
                 self.queue_timestamp_dict[server_id] = last_sent_timestamp
+            
+            if file.endswith('_vector_timestamp'):
+                lines = self.file_manager.fast_read(file)
+                self.vector_timestamp = json.loads(lines)
 
         for file in queue_msg_files:
-            if not file.endswith('_last_sent_timestamp'):
+            if not file.endswith('_timestamp'):
                 timestamp = int(file)
                 self.delete_timestamp_queue.put(timestamp)
                 message = json.loads(self.file_manager.fast_read(file))
@@ -233,5 +246,4 @@ class ServerPoolManager:
             self.thread_events[i].set()
         self.delete_timestamp_queue.put(timestamp)
         file_name = str(timestamp)
-        print("here 2")
         self.file_manager.fast_write(file_name, json.dumps(message).encode('utf-8'))
