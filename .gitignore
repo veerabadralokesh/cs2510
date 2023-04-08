@@ -19,3 +19,4 @@ chatsystem/Dockerfile.base
 chat_env
 .vscode/
 
+chatsystem/chat_server
