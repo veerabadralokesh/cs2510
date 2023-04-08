@@ -220,7 +220,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     
     def Ping(self, request, context):
         server_id = request.server_id
-        self.spm.send_msg_to_recovered_servers(server_id)
+        if server_id:
+            self.spm.send_msg_to_recovered_servers(server_id)
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
 
@@ -242,6 +243,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         message_type = message.get('message_type')
         group_id = message.get('group_id')
         user_id = message.get('user_id')
+        incoming_server_id = message["server_id"]
 
         self.spm.update_vector_timestamp(message)
 
@@ -249,9 +251,9 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             # add vector timestamp to message
             self.data_store.save_message(message)
             if message_type == C.USER_LEFT:
-                self.data_store.remove_user_from_group(group_id, user_id, server_id=message["server_id"])
+                self.data_store.remove_user_from_group(group_id, user_id, server_id=incoming_server_id)
             if message_type == C.USER_JOIN:
-                self.data_store.add_user_to_group(group_id, user_id, server_id=message["server_id"])
+                self.data_store.add_user_to_group(group_id, user_id, server_id=incoming_server_id)
             # trigger new message event i.e. calling getmessages
             # self.new_message_event.set()
             self.get_group_message_event(group_id).set()
