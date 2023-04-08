@@ -73,6 +73,7 @@ message Message {
     string message_id = 5;
     map<string, int32> likes = 7;
     string message_type = 6;
+    string previous_message_id = 8;
 }
 
 message ServerMessage {

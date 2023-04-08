@@ -56,6 +56,7 @@ NEW_MESSAGE_SCROLL = "New message arrived, scrolling to the bottom"
 SCROLL_REACHED_BOTTOM = "Reached bottom of messages"
 SCROLL_REACHED_TOP = "Reached top of messages"
 
+NEGATIVE_MESSAGE_INDEX = 'NEGATIVE_MESSAGE_INDEX'
 
 INIT_MESSAGES = {
     0: "Commands",

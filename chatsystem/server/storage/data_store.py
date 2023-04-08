@@ -50,6 +50,7 @@ class Datastore(DataManager):
         self.loaded_data = False
         self.file_manager = file_manager
         self.recover_data_from_disk()
+
         # self.reorder_messages()
     
     def get_group_lock(self, group_id):
@@ -105,12 +106,24 @@ class Datastore(DataManager):
             ## If new message timestamp is after the last message add it to the end
             if len(message_ids) == 0 or self.compare_timestamps(self.messages[message_ids[-1]], message) == 0:
                 self.groups[group_id]["message_ids"].append(message_id)
+                self.groups[group_id]['change_log'].append({
+                    "message_id": message_id,
+                    "type": C.CHANGE_LOG_APPEND
+                })
+                self.file_manager.append(f'{group_id}_change_log.log', f'{C.CHANGE_LOG_APPEND}:{message_id}')
+
             else: ## Else binary search the array to get proper insert index
                 insert_index = self.binary_search(message_ids, message)
                 self.groups[group_id]["message_ids"].insert(insert_index, message_id)
+                previous_message_id = self.groups[group_id]["message_ids"][insert_index-1] if insert_index > 0 else C.NEGATIVE_MESSAGE_INDEX
+                self.groups[group_id]['change_log'].append({
+                    "message_id": message_id,
+                    "type": C.CHANGE_LOG_INSERT,
+                    "previous_message_id": previous_message_id
+                })
+                self.file_manager.append(f'{group_id}_change_log.log', f"{C.CHANGE_LOG_INSERT}:{message_id}:{previous_message_id}")
             self.file_manager.append(f'{group_id}_messages.txt', message)
-        pass
-
+            
     def save_message(self, message):
         """
         saves new msgs, updates msgs and likes unlikes them
@@ -138,7 +151,11 @@ class Datastore(DataManager):
                     if original_message["user_id"] == key:
                         return
                     original_message["likes"][key] = val
-                self.groups[group_id]["updated_ids"].append(message_id)
+                # self.groups[group_id]["updated_ids"].append(message_id)
+                self.groups[group_id]['change_log'].append({
+                    "message_id": message_id,
+                    "type": C.CHANGE_LOG_UPDATE,
+                })
                 self.file_manager.append(f'{group_id}_messages.txt', original_message)
 
         return message
@@ -168,7 +185,7 @@ class Datastore(DataManager):
                 message_list.append(message)
         return message_list
     
-    def get_messages(self, group_id, start_index=-10, updated_idx=None):
+    def get_messages(self, group_id, start_index=-10, change_log_index=None):
         """
         called when user wants to quits history or newly joins
         """
@@ -177,16 +194,33 @@ class Datastore(DataManager):
             return []
 
         with self.get_group_lock(group_id):
-            all_msg_ids = group.get('message_ids')
-            message_ids = all_msg_ids[start_index:]
-            last_index = len(all_msg_ids)
-            updated_ids = None
-            if updated_idx is not None:
-                updated_ids = group.get('updated_ids')[updated_idx:]
-                message_ids.extend(updated_ids)
-            updated_idx = len(group.get('updated_ids'))
+            # last_index = len(all_msg_ids)
+            # updated_ids = None
+            # if updated_idx is not None:
+            #     updated_ids = group.get('updated_ids')[updated_idx:]
+            #     message_ids.extend(updated_ids)
+            # updated_idx = len(group.get('updated_ids'))
+            if start_index > 0:
+                messages_list = []
+                change_log = group.get('change_log')[change_log_index:]
+                for change in change_log:
+                    if change['type'] == C.CHANGE_LOG_APPEND:
+                        messages_list.append(self.messages.get(change['message_id']))
+                    elif change['type'] == C.CHANGE_LOG_UPDATE:
+                        messages_list.append(self.messages.get(change['message_id']))
+                    elif change['type'] == C.CHANGE_LOG_INSERT:
+                        message = self.messages.get(change['message_id'])
+                        message['previous_message_id'] = change['previous_message_id']
+                        messages_list.append(message)
+                    else:
+                        raise Exception('Unknown change type')
+            else:
+                all_msg_ids = group.get('message_ids')
+                message_ids = all_msg_ids[start_index:]
+                messages_list = self.get_message_list(message_ids)
+            change_log_index = len(group.get('change_log'))
 
-        return last_index, self.get_message_list(message_ids), updated_idx
+        return change_log_index, messages_list
     
     def get_group(self, group_id):
         return self.groups.get(group_id)
@@ -197,7 +231,7 @@ class Datastore(DataManager):
             'users': users,
             'message_ids': [],
             'creation_time': creation_time,
-            'updated_ids': []
+            'change_log': []
         }
         self.groups[group_id] = group
         logging.info(f"Group {group_id} created")
@@ -236,46 +270,47 @@ class Datastore(DataManager):
         txt_files = [f for f in all_files if f.endswith('.txt')]
         for file in txt_files:
             messages = self.file_manager.read(file).split('\n')
-            message_ids = {}
+            # message_ids = {}
             for message in messages:
                 try:
                     message_data = json.loads(message)
                     message_id = message_data['message_id']
-                    group_id = message_data['group_id']
-                    if message_id not in message_ids:
-                        message_ids[message_id] = 1
-                        self.groups[group_id]['message_ids'].append(message_id)
+                    # group_id = message_data['group_id']
+                    # if message_id not in message_ids:
+                        # message_ids[message_id] = 1
+                        # self.groups[group_id]['message_ids'].append(message_id)
                     self.messages[message_id] = message_data
                 except json.decoder.JSONDecodeError:
                     pass
+        log_files = [f for f in all_files if f.endswith('.log')]
+        for file in log_files:
+            change_logs = self.file_manager.read(file).split('\n')
+            first_message_id = change_logs[0]
+            last_message_id = first_message_id
+            message_tree = {last_message_id: None}
+            for log in change_logs[1:]:
+                if log.startswith(C.CHANGE_LOG_INSERT):
+                    _, message_id, previous_message_id = log.split(':')
+                    if previous_message_id == C.NEGATIVE_MESSAGE_INDEX:
+                        message_tree[message_id] = first_message_id
+                        first_message_id = message_id
+                    else:
+                        message_tree[message_id] = message_tree[previous_message_id]
+                        message_tree[previous_message_id] = message_id
+                elif log.startswith(C.CHANGE_LOG_APPEND):
+                    _, message_id = log.split(':')
+                    message_tree[last_message_id] = message_id
+                    message_tree[message_id] = None
+                    last_message_id = message_id
+                else:
+                    raise Exception("Unknown Log")
+            current_link  = first_message_id
+            group_id = file[:file.index('_change_log.log')]
+            self.groups[group_id]['message_ids'] = []
+            message_ids = self.groups[group_id]['message_ids']
+            
+            while current_link:
+                message_ids.append(current_link)
+                current_link = message_tree.get(current_link)
 
-    # def __del__(self):
-    #     self.save_on_file()
-    
-    # def load_from_file(self):
-    #     logging.info('loading data from file system')
-    #     if C.STORE_DATA_ON_FILE_SYSTEM and os.path.isfile(C.DATA_STORE_FILE_PATH):
-    #         with open(C.DATA_STORE_FILE_PATH) as rf:
-    #             server_data = json.load(rf)
-    #             self.messages = ServerCollection(server_data.get("messages", {}))
-    #             self.sessions = ServerCollection(server_data.get("sessions", {}))
-    #             self.groups = ServerCollection(server_data.get("groups", {}))
-    #             self.loaded_data = True
-
-    # def save_on_file(self):
-    #     logging.info("saving data on file system")
-    #     try:
-    #         if C.STORE_DATA_ON_FILE_SYSTEM and self.loaded_data:
-    #             server_data = {
-    #                 'messages': self.messages.get_dict(),
-    #                 'sessions': self.sessions.get_dict(),
-    #                 'groups': self.groups.get_dict(),
-    #             }
-    #             with open(C.DATA_STORE_FILE_PATH, 'w') as wf:
-    #                 json.dump(server_data, wf)
-    #     except Exception as e:
-    #         pass
-
-
-# data_store = Datastore()
 

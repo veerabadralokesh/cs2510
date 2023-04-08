@@ -150,7 +150,9 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                         # self.new_message_event.set()
                         self.get_group_message_event(group_id).set()
                 break
-            last_msg_idx, new_messages, updated_idx = self.data_store.get_messages(group_id, start_index=last_msg_idx, updated_idx=updated_idx)
+            updated_idx, new_messages = self.data_store.get_messages(group_id, start_index=last_msg_idx, change_log_index=updated_idx)
+            
+            last_msg_idx = 1
             
             for new_message in new_messages:
                 
@@ -161,7 +163,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                     text=new_message.get("text", []),
                     message_id=new_message["message_id"],
                     likes=new_message.get("likes"),
-                    message_type=new_message["message_type"]
+                    message_type=new_message["message_type"],
+                    previous_message_id=new_message.get('previous_message_id')
                 )
 
                 yield message_grpc
