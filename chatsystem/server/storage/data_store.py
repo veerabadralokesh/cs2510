@@ -289,6 +289,8 @@ class Datastore(DataManager):
             last_message_id = first_message_id
             message_tree = {last_message_id: None}
             for log in change_logs[1:]:
+                if not log:
+                    continue
                 if log.startswith(C.CHANGE_LOG_INSERT):
                     _, message_id, previous_message_id = log.split(':')
                     if previous_message_id == C.NEGATIVE_MESSAGE_INDEX:
