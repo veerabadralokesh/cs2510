@@ -65,7 +65,7 @@ class ServerPoolManager:
         self.active_stubs = {}
         self.thread_events = {}
         self.message_queues = {}
-        self.vector_timestamp = {i: 0 for i in range(1, C.NUM_SERVERS+1)}
+        self.vector_timestamp = {str(i): 0 for i in range(1, C.NUM_SERVERS+1)}
         self.delete_timestamp_queue = Queue()
         self.vector_timestamp_lock = threading.Lock()
         self.message_timestamp_lock = threading.Lock()
@@ -77,10 +77,12 @@ class ServerPoolManager:
     def update_vector_timestamp(self, message=None):
         with self.vector_timestamp_lock:
             if message:
+                print(message)
+                print(self.vector_timestamp)
                 for key in self.vector_timestamp:
                     self.vector_timestamp[key] = max(self.vector_timestamp[key], message.get('vector_timestamp')[key])
                 # self.vector_timestamp = list(map(max, zip(self.vector_timestamp, message.get('vector_timestamp'))))
-            self.vector_timestamp[self.id] += 1
+            self.vector_timestamp[str(self.id)] += 1
             self.file_manager.fast_write(f"{self.id}_vector_timestamp", json.dumps(self.vector_timestamp).encode('utf-8'))
             if not message:
                 return self.vector_timestamp.copy()
@@ -110,7 +112,7 @@ class ServerPoolManager:
                         while message_queue.qsize():
                             queue_message = message_queue.queue[0]
                             timestamp, message = queue_message
-                            
+                            print('message', message)
                             server_message = chat_system_pb2.ServerMessage(
                                 group_id=message.get('group_id'),
                                 user_id=message.get('user_id'),
@@ -219,7 +221,9 @@ class ServerPoolManager:
             
             if file.endswith('_vector_timestamp'):
                 lines = self.file_manager.fast_read(file)
-                self.vector_timestamp = json.loads(lines)
+                data = json.loads(lines)
+                if data:
+                    self.vector_timestamp = data
 
         for file in queue_msg_files:
             if not file.endswith('_timestamp'):
@@ -237,6 +241,8 @@ class ServerPoolManager:
     def send_msg_to_connected_servers(self, message, event_type=C.MESSAGE_EVENT):
         timestamp = self.get_unique_timestamp()
         message['event_type'] = event_type
+        if 'vector_timestamp' not in message:
+            message['vector_timestamp'] = self.update_vector_timestamp()
         queue_object = (timestamp, message)
         for i in range(1, self.num_servers + 1):
             # try:

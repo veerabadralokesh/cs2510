@@ -154,6 +154,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         message['vector_timestamp'] = self.spm.update_vector_timestamp()
         
         server_message = self.data_store.save_message(message)
+        print('server_message', server_message)
         self.spm.send_msg_to_connected_servers(server_message)
         self.new_message_event.set()
 

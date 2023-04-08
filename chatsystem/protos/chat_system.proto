@@ -82,8 +82,8 @@ message ServerMessage {
     string message_id = 5;
     map<string, int32> likes = 7;
     string message_type = 6;
-    map<int32, int32> vector_timestamp = 8;
+    map<string, int32> vector_timestamp = 8;
     string event_type = 9;
     repeated string users = 10;
-    int8 server_id = 11;
+    int32 server_id = 11;
 }

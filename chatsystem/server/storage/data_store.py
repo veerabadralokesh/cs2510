@@ -49,7 +49,7 @@ class Datastore(DataManager):
         self.loaded_data = False
         self.file_manager = file_manager
         self.recover_data_from_disk()
-        self.reorder_messages()
+        # self.reorder_messages()
 
     def compare_timestamps(self, message1, message2):
         server1 = message1.get('server_id')
@@ -72,21 +72,34 @@ class Datastore(DataManager):
             return 0 # return (message1, message2)
         return 1 #(message2, message1)
 
-    def binary_search(self, message_list, new_message):
+    def binary_search(self, message_id_list, new_message):
         left = 0
-        right = len(message_list)-1
+        right = len(message_id_list)-1
+        if right == -1:
+            return left
+        if left == right:
+            return left + 1
         while left < right:
             mid = (left + right)//2
-            greater = self.compare_timestamps(new_message, message_list[mid])
+            greater = self.compare_timestamps(new_message, self.messages[message_id_list[mid]])
             if greater == 0:
                 right = mid
             elif greater == 1:
                 left = mid + 1
+        print('len(message_id_list)',len(message_id_list))
+        print('left', left)
+        print('right', right)
+        return left + 1
         
-        return left
-        
-    def reorder_messages():
-        binary_search(message_list, message)
+    def insert_new_message(self, group_id, message_id, message):
+        insert_index = self.binary_search(self.groups[group_id]["message_ids"], message)
+        message["likes"] = {}
+        self.messages[message_id] = message
+        with self._lock:
+            # if group_id not in self.groups:
+            #     self.create_group(group_id)
+            self.groups[group_id]["message_ids"].insert(insert_index, message_id)
+            self.file_manager.append(f'{group_id}_messages.txt', message)
         pass
 
     def save_message(self, message):
@@ -100,13 +113,7 @@ class Datastore(DataManager):
         message["creation_time"] = int(message["creation_time"])
 
         if message["message_type"] in (C.NEW, C.USER_JOIN, C.USER_LEFT):
-            with self._lock:
-                self.messages[message_id] = message
-                message["likes"] = {}
-                # if group_id not in self.groups:
-                #     self.create_group(group_id)
-                self.groups[group_id]["message_ids"].append(message_id)
-                self.file_manager.append(f'{group_id}_messages.txt', message)
+            self.insert_new_message(group_id, message_id, message)
 
         # elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
         #     with self._lock:
