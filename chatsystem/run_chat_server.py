@@ -187,6 +187,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         message = MessageToDict(request, preserving_proto_field_name=True)
         # add vector timestamp to message
+        message['server_id'] = self.server_id
         self.new_message(message)
         return status
     
