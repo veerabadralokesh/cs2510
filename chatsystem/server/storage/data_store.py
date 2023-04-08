@@ -39,13 +39,13 @@ class ServerCollection():
 
 class Datastore(DataManager):
 
-    def __init__(self, file_manager: FileManager, messages={}, users={}, groups={}) -> None:
+    def __init__(self, file_manager: FileManager, messages={}, sessions={}, groups={}) -> None:
         # messages = {message_object, }
         super().__init__()
         self._lock = threading.Lock()
         self.locks = ServerCollection()
         self.messages = ServerCollection(messages)
-        self.sessions = ServerCollection(users)
+        self.sessions = ServerCollection(sessions)
         self.groups = ServerCollection(groups)
         self.loaded_data = False
         self.file_manager = file_manager
@@ -191,7 +191,7 @@ class Datastore(DataManager):
     def get_group(self, group_id):
         return self.groups.get(group_id)
     
-    def create_group(self, group_id, users=[], creation_time=get_timestamp()):
+    def create_group(self, group_id, users={}, creation_time=get_timestamp()):
         group = {
             'group_id': group_id,
             'users': users,
@@ -204,10 +204,13 @@ class Datastore(DataManager):
         self.file_manager.write(f'{group_id}.json', group)
         return group
 
-    def add_user_to_group(self, group_id, user_id):
+    def add_user_to_group(self, group_id, user_id, server_id):
         # print("inside add_user_to_group group id", group_id, "users", user_id)
-        self.groups[group_id]['users'].append(user_id)
-        logging.info(f"{user_id} joined {group_id}")
+        with self.get_group_lock(group_id):
+            if server_id not in self.groups[group_id]['users']:
+                self.groups[group_id]['users'][server_id] = []
+            self.groups[group_id]['users'][server_id].append(user_id)
+            logging.info(f"{user_id} joined {group_id}")
         # self.save_message({"group_id": group_id, 
         # "user_id": user_id,
         # "creation_time": get_timestamp(),
@@ -215,12 +218,13 @@ class Datastore(DataManager):
         # "text":[],
         # "message_type": C.USER_JOIN})
     
-    def remove_user_from_group(self, group_id, user_id):
-        if user_id not in self.groups[group_id]['users']:
-            return
-        index = self.groups[group_id]['users'].index(user_id)
-        del self.groups[group_id]['users'][index]
-        logging.info(f"{user_id} removed from {group_id}")
+    def remove_user_from_group(self, group_id, user_id, server_id):
+        with self.get_group_lock(group_id):
+            if user_id not in self.groups[group_id]['users'].get(server_id, []):
+                return
+            index = self.groups[group_id]['users'][server_id].index(user_id)
+            del self.groups[group_id]['users'][server_id][index]
+            logging.info(f"{user_id} removed from {group_id}")
 
     def recover_data_from_disk(self):
         all_files = self.file_manager.list_files()

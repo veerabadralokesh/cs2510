@@ -47,19 +47,25 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             group = self.data_store.create_group(group_id)
             group_created = True
             
-        self.data_store.add_user_to_group(group_id, user_id)
+        self.data_store.add_user_to_group(group_id, user_id, server_id = self.server_id)
 
         if group_created:
             server_message = {
                 "group_id": group_id,
-                "users": group.get('users', []),
+                # "users": group.get('users', {}),
                 "creation_time": group.get('creation_time')
             }
             self.spm.send_msg_to_connected_servers(server_message, event_type=C.GROUP_EVENT)
 
+        group = self.data_store.get_group(group_id)
+        users = group.get('users')
+        users_list = []
+        for userl in users.values():
+            users_list.extend(userl)
+        users_list = list(set(users_list))
         group_details = chat_system_pb2.GroupDetails(
             group_id=group_id, 
-            users=self.data_store.get_group(group_id)["users"], 
+            users=users_list, 
             status=True
             )
         return group_details
@@ -98,7 +104,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         group_id = request.group_id
         user_id = request.user_id
         session_id = request.session_id
-        group = self.data_store.remove_user_from_group(group_id, user_id)
+        group = self.data_store.remove_user_from_group(group_id, user_id, server_id=self.server_id)
         status = chat_system_pb2.Status(status=True, statusMessage="")
         logging.info(f"{user_id} exited from group {group_id}")
         self.new_message({"group_id": group_id, 
@@ -139,7 +145,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                 if session_info["group_id"] == group_id:
                     session_info = self.data_store.get_session_info(session_id)
                     if session_info.get('context') and not session_info.get('context').is_active():
-                        self.data_store.remove_user_from_group(group_id, user_id)
+                        self.data_store.remove_user_from_group(group_id, user_id, server_id=self.server_id)
                         self.data_store.save_session_info(session_id, user_id, is_active=False)
                         # self.new_message_event.set()
                         self.get_group_message_event(group_id).set()
@@ -202,7 +208,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                     "message_id": get_unique_id(),
                     "text":[],
                     "message_type": C.USER_LEFT})
-                    self.data_store.remove_user_from_group(group_id, user_id)
+                    self.data_store.remove_user_from_group(group_id, user_id, server_id=self.server_id)
                     self.data_store.save_session_info(session_id, user_id, is_active=False)
                     # self.new_message_event.set()
                     self.get_group_message_event(group_id).set()
@@ -239,14 +245,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             # add vector timestamp to message
             self.data_store.save_message(message)
             if message_type == C.USER_LEFT:
-                self.data_store.remove_user_from_group(group_id, user_id)
+                self.data_store.remove_user_from_group(group_id, user_id, server_id=message["server_id"])
             if message_type == C.USER_JOIN:
-                self.data_store.add_user_to_group(group_id, user_id)
+                self.data_store.add_user_to_group(group_id, user_id, server_id=message["server_id"])
             # trigger new message event i.e. calling getmessages
             # self.new_message_event.set()
             self.get_group_message_event(group_id).set()
         elif event_type == C.GROUP_EVENT:
-            users = message.get('users', [])
+            users = message.get('users', {})
             creation_time = message.get('creation_time')
             if not self.data_store.get_group(group_id):
                 # print(f'creating group {group_id}')
