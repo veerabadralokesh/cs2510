@@ -5,7 +5,7 @@ NUM_SERVERS = 5
 
 STORE_DATA_ON_FILE_SYSTEM = True
 
-DATA_STORE_FILE_DIR_PATH = os.path.join(os.path.expanduser('~'), 'data', 'chat_server{}')
+DATA_STORE_FILE_DIR_PATH = os.path.join(os.path.expanduser('~'), 'chat_server_data', 'chat_server{}')
 
 # os.makedirs(DATA_STORE_FILE_DIR_PATH, exist_ok=True)
 
