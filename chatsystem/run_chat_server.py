@@ -9,7 +9,7 @@ import chat_system_pb2_grpc
 import grpc
 import server.constants as C
 from google.protobuf.json_format import MessageToDict
-from server.storage.data_store import Datastore
+from server.storage.data_store import Datastore, ServerCollection
 from server.storage.file_manager import FileManager
 from server.storage.utils import get_unique_id, get_timestamp
 from server.server_pool_manager import ServerPoolManager
@@ -22,11 +22,23 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     def __init__(self, data_store: Datastore, spm: ServerPoolManager, file_manager: FileManager, server_id) -> None:
         super().__init__()
         self.data_store = data_store
-        self.new_message_event = threading.Event()
+        # self.new_message_event = threading.Event()
+        self._lock = threading.Lock()
+        self.group_message_events = ServerCollection()
         self.spm = spm
         self.file_manager = file_manager
         self.server_id = server_id
         pass
+    
+    def get_group_message_event(self, group_id):
+        event = self.group_message_events.get(group_id)
+        if event:
+            return event
+        else:
+            with self._lock:
+                if group_id not in self.group_message_events:
+                    self.group_message_events[group_id] = threading.Event()
+                return self.group_message_events[group_id]
 
     def get_group_details(self, group_id: str, user_id: str) -> chat_system_pb2.GroupDetails:
 
@@ -105,7 +117,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         # self.spm.send_msg_to_connected_servers(server_message, event_type=C.GROUP_EVENT)
         
 
-        self.new_message_event.set()
+        # self.new_message_event.set()
+        self.get_group_message_event(group_id).set()
         self.data_store.save_session_info(request.session_id, user_id)
         return status
 
@@ -128,7 +141,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                     if session_info.get('context') and not session_info.get('context').is_active():
                         self.data_store.remove_user_from_group(group_id, user_id)
                         self.data_store.save_session_info(session_id, user_id, is_active=False)
-                        self.new_message_event.set()
+                        # self.new_message_event.set()
+                        self.get_group_message_event(group_id).set()
                 break
             last_msg_idx, new_messages, updated_idx = self.data_store.get_messages(group_id, start_index=last_msg_idx, updated_idx=updated_idx)
             
@@ -146,17 +160,22 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
                 yield message_grpc
 
-            self.new_message_event.clear()
-            self.new_message_event.wait()
+            # self.new_message_event.clear()
+            # self.new_message_event.wait()
+            self.get_group_message_event(group_id).clear()
+            self.get_group_message_event(group_id).wait()
 
 
     def new_message(self, message):
         message['vector_timestamp'] = self.spm.update_vector_timestamp()
         
         server_message = self.data_store.save_message(message)
-        print('server_message', server_message)
+        # print('server_message', server_message)
         self.spm.send_msg_to_connected_servers(server_message)
-        self.new_message_event.set()
+        # self.new_message_event.set()
+        group_id = message.get("group_id")
+        if group_id:
+            self.get_group_message_event(group_id).set()
 
     def PostMessage(self, request, context):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
@@ -185,7 +204,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                     "message_type": C.USER_LEFT})
                     self.data_store.remove_user_from_group(group_id, user_id)
                     self.data_store.save_session_info(session_id, user_id, is_active=False)
-                    self.new_message_event.set()
+                    # self.new_message_event.set()
+                    self.get_group_message_event(group_id).set()
         return status
     
     def Ping(self, request, context):
@@ -223,7 +243,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             if message_type == C.USER_JOIN:
                 self.data_store.add_user_to_group(group_id, user_id)
             # trigger new message event i.e. calling getmessages
-            self.new_message_event.set()
+            # self.new_message_event.set()
+            self.get_group_message_event(group_id).set()
         elif event_type == C.GROUP_EVENT:
             users = message.get('users', [])
             creation_time = message.get('creation_time')

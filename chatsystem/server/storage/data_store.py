@@ -22,7 +22,7 @@ class ServerCollection():
         return self._state[key]
 
     def __contains__(self, key):
-        print(key, self._state)
+        # print(key, self._state)
         return (key in self._state)
 
     def __str__(self) -> str:
@@ -43,6 +43,7 @@ class Datastore(DataManager):
         # messages = {message_object, }
         super().__init__()
         self._lock = threading.Lock()
+        self.locks = ServerCollection()
         self.messages = ServerCollection(messages)
         self.sessions = ServerCollection(users)
         self.groups = ServerCollection(groups)
@@ -50,6 +51,16 @@ class Datastore(DataManager):
         self.file_manager = file_manager
         self.recover_data_from_disk()
         # self.reorder_messages()
+    
+    def get_group_lock(self, group_id):
+        lock = self.locks.get(group_id)
+        if lock:
+            return lock
+        else:
+            with self._lock:
+                if group_id not in self.locks:
+                    self.locks[group_id] = threading.Lock()
+                return self.locks[group_id]
 
     def compare_timestamps(self, message1, message2):
         server1 = message1.get('server_id')
@@ -65,20 +76,18 @@ class Datastore(DataManager):
             else:
                 comparison_dict["equal"] += 1
         if comparison_dict["less"] > 0 and comparison_dict["greater"] == 0:
-            return 0 # return (message1, message2)
+            return 0 # return (message1, message2) # message1 is older than message2
         if comparison_dict["less"] == 0 and comparison_dict["greater"] > 0:
-            return 1 # return (message2, message1)
+            return 1 # return (message2, message1) # message2 is older than message1
         if server1 < server2:
-            return 0 # return (message1, message2)
-        return 1 #(message2, message1)
+            return 0 # return (message1, message2) # message1 is older than message2
+        return 1 #(message2, message1) # message2 is older than message1
 
     def binary_search(self, message_id_list, new_message):
         left = 0
-        right = len(message_id_list)-1
-        if right == -1:
+        right = len(message_id_list)
+        if right == 0:
             return left
-        if left == right:
-            return left + 1
         while left < right:
             mid = (left + right)//2
             greater = self.compare_timestamps(new_message, self.messages[message_id_list[mid]])
@@ -86,19 +95,19 @@ class Datastore(DataManager):
                 right = mid
             elif greater == 1:
                 left = mid + 1
-        print('len(message_id_list)',len(message_id_list))
-        print('left', left)
-        print('right', right)
-        return left + 1
+        return left
         
     def insert_new_message(self, group_id, message_id, message):
-        insert_index = self.binary_search(self.groups[group_id]["message_ids"], message)
-        message["likes"] = {}
-        self.messages[message_id] = message
-        with self._lock:
-            # if group_id not in self.groups:
-            #     self.create_group(group_id)
-            self.groups[group_id]["message_ids"].insert(insert_index, message_id)
+        with self.get_group_lock(group_id):
+            message["likes"] = {}
+            self.messages[message_id] = message
+            message_ids = self.groups[group_id]["message_ids"]
+            ## If new message timestamp is after the last message add it to the end
+            if len(message_ids) == 0 or self.compare_timestamps(self.messages[message_ids[-1]], message) == 0:
+                self.groups[group_id]["message_ids"].append(message_id)
+            else: ## Else binary search the array to get proper insert index
+                insert_index = self.binary_search(message_ids, message)
+                self.groups[group_id]["message_ids"].insert(insert_index, message_id)
             self.file_manager.append(f'{group_id}_messages.txt', message)
         pass
 
@@ -116,14 +125,14 @@ class Datastore(DataManager):
             self.insert_new_message(group_id, message_id, message)
 
         # elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
-        #     with self._lock:
+        #     with self.get_group_lock(group_id):
         #         original_message = self.messages[message_id]
         #         original_message["text"].extend(message["text"])
         #         self.groups[group_id]["updated_ids"].append(message_id)
         #         self.file_manager.append(f'{group_id}_messages.txt', original_message)
         else:
             # like / unlike message_type
-            with self._lock:
+            with self.get_group_lock(group_id):
                 original_message = self.messages[message_id]
                 for key, val in message["likes"].items():
                     if original_message["user_id"] == key:
@@ -167,7 +176,7 @@ class Datastore(DataManager):
         if group is None:
             return []
 
-        with self._lock:
+        with self.get_group_lock(group_id):
             all_msg_ids = group.get('message_ids')
             message_ids = all_msg_ids[start_index:]
             last_index = len(all_msg_ids)

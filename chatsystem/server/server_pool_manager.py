@@ -45,7 +45,7 @@ def join_server(server_string, server_id):
         # print(f"Trying to connect to server: {server_string}")
         channel = grpc.insecure_channel(server_string)
         stub = chat_system_pb2_grpc.ChatServerStub(channel)
-        server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=server_id))
+        server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=server_id), timeout=1)
         if server_status.status is True:
             print(f"Connected to server: {server_string}")
             return stub
@@ -61,7 +61,7 @@ class ServerPoolManager:
         """
         self.id = id
         self.file_manager = file_manager
-        self.num_servers = 5
+        self.num_servers = C.NUM_SERVERS
         self.active_stubs = {}
         self.thread_events = {}
         self.message_queues = {}
@@ -77,8 +77,8 @@ class ServerPoolManager:
     def update_vector_timestamp(self, message=None):
         with self.vector_timestamp_lock:
             if message:
-                print(message)
-                print(self.vector_timestamp)
+                # print(message)
+                # print(self.vector_timestamp)
                 for key in self.vector_timestamp:
                     self.vector_timestamp[key] = max(self.vector_timestamp[key], message.get('vector_timestamp')[key])
                 # self.vector_timestamp = list(map(max, zip(self.vector_timestamp, message.get('vector_timestamp'))))
@@ -112,7 +112,7 @@ class ServerPoolManager:
                         while message_queue.qsize():
                             queue_message = message_queue.queue[0]
                             timestamp, message = queue_message
-                            print('message', message)
+                            # print('message', message)
                             server_message = chat_system_pb2.ServerMessage(
                                 group_id=message.get('group_id'),
                                 user_id=message.get('user_id'),
@@ -127,7 +127,7 @@ class ServerPoolManager:
                                 server_id=message.get('server_id', self.id),
                             )
                             try:
-                                status = stub.SyncMessagetoServer(server_message)
+                                status = stub.SyncMessagetoServer(server_message, timeout=0.5)
                                 if status.status:
                                     message_queue.get(0)
                                     self.queue_timestamp_dict[server_id] = timestamp
