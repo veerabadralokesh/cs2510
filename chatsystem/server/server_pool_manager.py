@@ -7,6 +7,7 @@ import chat_system_pb2
 import chat_system_pb2_grpc
 import server.constants as C
 from server.storage.file_manager import FileManager
+from server.storage.data_store import Datastore
 from server.storage.utils import get_timestamp
 from queue import Queue
 
@@ -56,14 +57,16 @@ def join_server(server_string, server_id):
         pass
 
 class ServerPoolManager:
-    def __init__(self, id, file_manager: FileManager) -> None:
+    def __init__(self, id, file_manager: FileManager, data_store: Datastore) -> None:
         """
         id: id of current server
         """
         self.start_timestamp = get_timestamp()
         self.id = id
         self.file_manager = file_manager
+        self.data_store = data_store
         self.num_servers = C.NUM_SERVERS
+        self.call_backs = {}
         self.active_stubs = {}
         self.connected_servers = {}
         self.thread_events = {}
@@ -76,6 +79,9 @@ class ServerPoolManager:
         self.create_message_queues()
         self.load_queue_messages_from_disk()
         self.connect_to_servers()
+    
+    def register_callback(self, call_back_key, call_back_func):
+        self.call_backs[call_back_key] = call_back_func
         
     def update_vector_timestamp(self, message=None):
         with self.vector_timestamp_lock:
@@ -113,13 +119,12 @@ class ServerPoolManager:
                                 ## Get group info from other servers
                                 server_message = {}
                                 self.send_to_server(server_message, target_server_id=i, event_type=C.GET_GROUP_META_DATA)
-                                pass
                             self.connected_servers[i] = True
-                            pass
                 except Exception as e:
                     # logging.error(f'failed to connect to {i}: {e}')
+                    if self.connected_servers[i]:
+                        self.call_backs[C.SERVER_DIED_CALLBACK](i)
                     self.connected_servers[i] = False
-                    pass
             sleep(C.PING_INTERVAL)
 
     def keep_alive_sync(self, server_id):
@@ -167,16 +172,16 @@ class ServerPoolManager:
                                             self.file_manager.fast_write(f"{server_id}_last_sent_timestamp", json.dumps(timestamp).encode('utf-8'))
 
                             except grpc.RpcError as er:
-                                logging.error(f'server disconnected {server_id}')
-                                del self.active_stubs[server_id]
-                                stub = None
+                                logging.error(f'error sending message to {server_id}')
+                                # del self.active_stubs[server_id]
+                                # stub = None
                                 break
                             except Exception as e:
                                 logging.error(e)
                                 break
-                        if stub is None:
-                            # if stub is None, don't wait for new messages
-                            break
+                        # if self.active_stubs.get(server_id) is None:
+                        #     # if stub is None, don't wait for new messages
+                        #     break
                         message_event.wait()
                         message_event.clear()
 
@@ -297,7 +302,7 @@ class ServerPoolManager:
     def send_msg_to_connected_servers(self, message, event_type=C.MESSAGE_EVENT):
         timestamp = self.get_unique_timestamp()
         message['event_type'] = event_type
-        self.check_message(message)
+        self.check_message(message, event_type)
         queue_object = (timestamp, message)
         for i in range(1, self.num_servers + 1):
             # try:

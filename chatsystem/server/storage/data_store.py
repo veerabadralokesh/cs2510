@@ -4,6 +4,7 @@ import os
 import json
 import logging
 import copy
+from functools import lru_cache
 import server.constants as C
 from server.storage.data_manager import DataManager
 from server.storage.file_manager import FileManager
@@ -33,15 +34,23 @@ class ServerCollection():
     
     def get_dict(self):
         return self._state
+    
+    def keys(self):
+        return self._state.keys()
+    
+    def items(self):
+        return self._state.items()
+    
 
 # global state
 # state = ServerCollection()
 
 class Datastore(DataManager):
 
-    def __init__(self, file_manager: FileManager, messages={}, sessions={}, groups={}) -> None:
+    def __init__(self, file_manager: FileManager, server_id=None, messages={}, sessions={}, groups={}) -> None:
         # messages = {message_object, }
         super().__init__()
+        self.server_id = server_id
         self._lock = threading.Lock()
         self.locks = ServerCollection()
         self.messages = ServerCollection(messages)
@@ -62,6 +71,52 @@ class Datastore(DataManager):
                 if group_id not in self.locks:
                     self.locks[group_id] = threading.Lock()
                 return self.locks[group_id]
+    
+    def get_groups_meta_data(self):
+        group_ids = self.groups.keys()
+        all_groups_meta_data = []
+        for group_id in group_ids:
+            group = self.groups.get(group_id)
+            all_groups_meta_data.append({
+                'group_id': group_id,
+                'creation_time': group.get('creation_time'),
+                'users': group.get('users').get(self.server_id, [])
+            })
+        return all_groups_meta_data
+    
+    def remove_group_participants_server_disconnected(self, server_id):
+        event_group_ids = []
+        for group_id, group in self.groups.items():
+            with self.get_group_lock(group_id):
+                group = self.groups.get(group_id)
+                if not group.get('users'):
+                    continue
+                group['users'][server_id] = []
+                group['updated_time'] = get_timestamp()
+                group['change_log'].append({
+                    "type": C.CHANGE_LOG_USERS_UPDATE,
+                })
+                event_group_ids.append(group_id)
+        return event_group_ids
+
+    
+    def update_group_meta_data(self, group_id, group_meta_data, incoming_server_id):
+        if self.get_group(group_id) is None:
+            creation_time = group_meta_data.get('creation_time')
+            self.create_group(group_id, users={}, creation_time=creation_time)
+        with self.get_group_lock(group_id=group_id):
+            user_list = group_meta_data.get('users', [])
+            existing_list = self.groups[group_id]['users'].get(incoming_server_id, [])
+            if not len(existing_list + user_list):
+                return False
+            self.groups[group_id]['users'][incoming_server_id] = user_list
+            self.groups[group_id]['updated_time'] = get_timestamp()
+            logging.info(f"Group {group_id} updated")
+            self.groups[group_id]['change_log'].append({
+                "type": C.CHANGE_LOG_USERS_UPDATE,
+            })
+            return True
+
 
     def compare_timestamps(self, message1, message2):
         server1 = message1.get('server_id')
@@ -185,6 +240,17 @@ class Datastore(DataManager):
                 message_list.append(message)
         return message_list
     
+    @lru_cache
+    def expand_user_list(self, group_id, _):
+        group = self.groups.get(group_id)
+        users = group.get('users')
+        users_list = []
+        if users:
+            for userl in users.values():
+                users_list.extend(userl)
+            users_list = list(users_list)
+        return users_list
+
     def get_messages(self, group_id, start_index=-10, change_log_index=None):
         """
         called when user wants to quits history or newly joins
@@ -212,6 +278,12 @@ class Datastore(DataManager):
                         message = self.messages.get(change['message_id'])
                         message['previous_message_id'] = change['previous_message_id']
                         messages_list.append(message)
+                    elif change['type'] == C.CHANGE_LOG_USERS_UPDATE:
+                        message = {
+                            'users': self.expand_user_list(group_id, group.get('updated_time')),
+                            'message_type': C.PARTICIPANT_LIST
+                        }
+                        messages_list.append(message)
                     else:
                         raise Exception('Unknown change type')
             else:
@@ -226,17 +298,19 @@ class Datastore(DataManager):
         return self.groups.get(group_id)
     
     def create_group(self, group_id, users={}, creation_time=get_timestamp()):
-        group = {
-            'group_id': group_id,
-            'users': users,
-            'message_ids': [],
-            'creation_time': creation_time,
-            'change_log': []
-        }
-        self.groups[group_id] = group
-        logging.info(f"Group {group_id} created")
-        self.file_manager.write(f'{group_id}.json', group)
-        return group
+        with self.get_group_lock(group_id=group_id):
+            group = {
+                'group_id': group_id,
+                'users': users,
+                'message_ids': [],
+                'creation_time': creation_time,
+                'change_log': [],
+                'updated_time': creation_time
+            }
+            self.groups[group_id] = group
+            logging.info(f"Group {group_id} created")
+            self.file_manager.write(f'{group_id}.json', group)
+            return group
 
     def add_user_to_group(self, group_id, user_id, server_id):
         # print("inside add_user_to_group group id", group_id, "users", user_id)
@@ -244,6 +318,7 @@ class Datastore(DataManager):
             if server_id not in self.groups[group_id]['users']:
                 self.groups[group_id]['users'][server_id] = []
             self.groups[group_id]['users'][server_id].append(user_id)
+            self.groups[group_id]['updated_time'] = get_timestamp()
             logging.info(f"{user_id} joined {group_id}")
         # self.save_message({"group_id": group_id, 
         # "user_id": user_id,
@@ -258,6 +333,7 @@ class Datastore(DataManager):
                 return
             index = self.groups[group_id]['users'][server_id].index(user_id)
             del self.groups[group_id]['users'][server_id][index]
+            self.groups[group_id]['updated_time'] = get_timestamp()
             logging.info(f"{user_id} removed from {group_id}")
 
     def recover_data_from_disk(self):
@@ -266,6 +342,7 @@ class Datastore(DataManager):
         for file in json_files:
             group_data = json.loads(self.file_manager.read(file))
             self.groups[group_data['group_id']] = group_data
+            # print('recover data:', group_data)
 
         txt_files = [f for f in all_files if f.endswith('.txt')]
         for file in txt_files:
@@ -285,7 +362,8 @@ class Datastore(DataManager):
         log_files = [f for f in all_files if f.endswith('.log')]
         for file in log_files:
             change_logs = self.file_manager.read(file).split('\n')
-            first_message_id = change_logs[0]
+            # print('change_logs', change_logs)
+            first_message_id = change_logs[0].split(':')[1]
             last_message_id = first_message_id
             message_tree = {last_message_id: None}
             for log in change_logs[1:]:
@@ -314,5 +392,5 @@ class Datastore(DataManager):
             while current_link:
                 message_ids.append(current_link)
                 current_link = message_tree.get(current_link)
-
+            # print('message_ids', message_ids)
 

@@ -11,7 +11,7 @@ import server.constants as C
 from google.protobuf.json_format import MessageToDict
 from server.storage.data_store import Datastore, ServerCollection
 from server.storage.file_manager import FileManager
-from server.storage.utils import get_unique_id, get_timestamp
+from server.storage.utils import get_unique_id, get_timestamp, clean_message
 from server.server_pool_manager import ServerPoolManager
 
 # data_store = Datastore()
@@ -28,7 +28,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         self.spm = spm
         self.file_manager = file_manager
         self.server_id = server_id
-        pass
+        self.spm.register_callback(C.SERVER_DIED_CALLBACK, self.remove_group_participants_server_disconnected)
+
+    def remove_group_participants_server_disconnected(self, server_id):
+        logging.info(f'server died {server_id}')
+        event_group_ids = self.data_store.remove_group_participants_server_disconnected(server_id=server_id)
+        # logging.info(f'{event_group_ids} events')
+        for group_id in event_group_ids:
+            self.group_message_events[group_id].set()
     
     def get_group_message_event(self, group_id):
         event = self.group_message_events.get(group_id)
@@ -58,11 +65,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             self.spm.send_msg_to_connected_servers(server_message, event_type=C.GROUP_EVENT)
 
         group = self.data_store.get_group(group_id)
-        users = group.get('users')
-        users_list = []
-        for userl in users.values():
-            users_list.extend(userl)
-        users_list = list(set(users_list))
+        users_list = self.data_store.expand_user_list(group_id, group.get('updated_time'))
         group_details = chat_system_pb2.GroupDetails(
             group_id=group_id, 
             users=users_list, 
@@ -155,13 +158,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             last_msg_idx = 1
             
             for new_message in new_messages:
-                
+                # print(new_message)
                 message_grpc = chat_system_pb2.Message(
-                    group_id=new_message["group_id"],
-                    user_id=new_message["user_id"],
-                    creation_time=new_message["creation_time"],
+                    group_id=new_message.get("group_id", group_id),
+                    user_id=new_message.get("user_id"),
+                    users=new_message.get("users"),
+                    creation_time=new_message.get("creation_time"),
                     text=new_message.get("text", []),
-                    message_id=new_message["message_id"],
+                    message_id=new_message.get("message_id"),
                     likes=new_message.get("likes"),
                     message_type=new_message["message_type"],
                     previous_message_id=new_message.get('previous_message_id')
@@ -239,6 +243,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         # then send
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         message = MessageToDict(request, preserving_proto_field_name=True)
+        clean_message(message)
         event_type = message['event_type']
         message_type = message.get('message_type')
         group_id = message.get('group_id')
@@ -264,7 +269,15 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                 # print(f'creating group {group_id}')
                 self.data_store.create_group(group_id, users, creation_time)
         elif event_type == C.GET_GROUP_META_DATA:
-            pass
+            all_groups_data = self.data_store.get_groups_meta_data()
+            for group_meta in all_groups_data:
+                # print('group_meta: ', group_meta)
+                self.spm.send_to_server(group_meta, target_server_id=incoming_server_id, event_type=C.GROUP_META_DATA)
+        elif event_type == C.GROUP_META_DATA:
+            group_meta_data = message
+            
+            if self.data_store.update_group_meta_data(group_id, group_meta_data, incoming_server_id):
+                self.get_group_message_event(group_id).set()
         else:
             raise Exception('Unknown event type')
         return status
@@ -282,8 +295,8 @@ def serve():
     args = get_args()
     try:
         file_manager = FileManager(root=C.DATA_STORE_FILE_DIR_PATH.format(args.id))
-        data_store = Datastore(file_manager)
-        spm = ServerPoolManager(args.id, file_manager)
+        data_store = Datastore(file_manager, server_id=args.id)
+        spm = ServerPoolManager(args.id, file_manager, data_store)
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10000))
         chat_system_pb2_grpc.add_ChatServerServicer_to_server(
             ChatServerServicer(data_store, spm, file_manager, args.id), server

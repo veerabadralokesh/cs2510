@@ -50,6 +50,7 @@ MESSAGES = "MESSAGES"
 NEW = "new"
 USER_JOIN = 'joined'
 USER_LEFT = 'left'
+PARTICIPANT_LIST = 'PARTICIPANT_LIST'
 
 INPUT_PROMPT = "Enter command"
 NEW_MESSAGE_SCROLL = "New message arrived, scrolling to the bottom"

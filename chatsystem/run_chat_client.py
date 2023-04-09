@@ -159,6 +159,12 @@ def get_messages(change_group_event):
         cancel_messages_thread.start()
         try:
             for message in messages:
+                message_type = message.message_type
+                msg_dict = MessageToDict(message)
+                if message_type == C.PARTICIPANT_LIST:
+                    state[C.GROUP_DATA]['users'] = msg_dict['users']
+                    logging.info('Updated participant list: ' + ",".join(msg_dict['users']))
+                    continue
                 if message.message_type in (C.USER_JOIN, C.USER_LEFT):
                     display_manager.write(f"{datetime.fromtimestamp(int(message.creation_time)/10**6)}: {message.user_id} {message.message_type} {message.group_id}.")
                     continue
@@ -168,7 +174,7 @@ def get_messages(change_group_event):
                     state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id] =  state[C.MESSAGE_NUMBER]
                     state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.MESSAGE_NUMBER]] = message.message_id
 
-                msg_dict = MessageToDict(message)
+                
                 if msg_dict.get("likes"):
                     count = sum(list(map(int, msg_dict.get("likes").values())))
                 else:
@@ -405,6 +411,8 @@ def run():
                 server_string = user_input[2:].strip()
                 if server_string == '':
                     server_string = C.DEFAULT_SERVER_CONNECTION_STRING
+                elif server_string in ['1', '2', '3', '4', '5']:
+                    server_string = f'localhost:{11999+int(server_string)}'
                 stub = join_server(server_string)
 
             # exit mode: q 

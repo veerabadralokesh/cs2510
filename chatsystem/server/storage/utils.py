@@ -21,3 +21,8 @@ def get_monotonically_increasing_timestamp():
 def is_valid_message(message):
     
     return True
+
+
+def clean_message(message: dict):
+    if 'creation_time' in message:
+        message['creation_time'] = int(message['creation_time'])

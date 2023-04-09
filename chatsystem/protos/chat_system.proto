@@ -75,6 +75,7 @@ message Message {
     map<string, int32> likes = 7;
     string message_type = 6;
     string previous_message_id = 8;
+    repeated string users = 9;
 }
 
 message ServerMessage {
