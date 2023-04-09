@@ -263,6 +263,10 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             if not self.data_store.get_group(group_id):
                 # print(f'creating group {group_id}')
                 self.data_store.create_group(group_id, users, creation_time)
+        elif event_type == C.GET_GROUP_META_DATA:
+            pass
+        else:
+            raise Exception('Unknown event type')
         return status
 
 def get_args():
