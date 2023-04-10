@@ -181,14 +181,16 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
     def new_message(self, message):
         message['vector_timestamp'] = self.spm.update_vector_timestamp()
+        clean_message(message)
         
         server_message = self.data_store.save_message(message)
         # print('server_message', server_message)
-        self.spm.send_msg_to_connected_servers(server_message)
-        # self.new_message_event.set()
-        group_id = message.get("group_id")
-        if group_id:
-            self.get_group_message_event(group_id).set()
+        if server_message:
+            self.spm.send_msg_to_connected_servers(server_message)
+            # self.new_message_event.set()
+            group_id = message.get("group_id")
+            if group_id:
+                self.get_group_message_event(group_id).set()
 
     def PostMessage(self, request, context):
         status = chat_system_pb2.Status(status=True, statusMessage = "")

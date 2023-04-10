@@ -187,7 +187,7 @@ class Datastore(DataManager):
             raise Exception("Invalid Message")
         message_id = message['message_id']
         group_id = message["group_id"]
-        message["creation_time"] = int(message["creation_time"])
+        # message["creation_time"] = int(message["creation_time"])
 
         if message["message_type"] in (C.NEW, C.USER_JOIN, C.USER_LEFT):
             self.insert_new_message(group_id, message_id, message)
