@@ -2,7 +2,7 @@ FROM ubuntu:latest
 ENV DEBIAN_FRONTEND noninteractive
 ENV USE_DIFFERENT_PORTS 0
 
-RUN apt update && apt install -y make gcc vim python3 python3-pip iproute2
+RUN apt update && apt install -y make gcc vim python3 python3-pip iproute2 python-is-python3
 
 WORKDIR /opt/docker/
 COPY requirements.txt /opt/docker/
