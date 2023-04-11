@@ -1,6 +1,7 @@
 import json
 import threading
 import logging
+import os
 from time import sleep
 import grpc
 import chat_system_pb2
@@ -11,6 +12,21 @@ from server.storage.data_store import Datastore
 from server.storage.utils import get_timestamp
 from queue import Queue
 
+# json_config = json.dumps(
+#     {
+#         "methodConfig": [
+#             {
+#                 "retryPolicy": {
+#                     "maxAttempts": 5,
+#                     "initialBackoff": "0.5s",
+#                     "maxBackoff": "10s",
+#                     "backoffMultiplier": 1.5,
+#                     "retryableStatusCodes": ["UNAVAILABLE"],
+#                 },
+#             }
+#         ]
+#     }
+# )
 
 class ThreadSafeDict:
     def __init__(self, initial={}):
@@ -88,6 +104,7 @@ class ServerPoolManager:
         try:
             # print(f"Trying to connect to server: {server_string}")
             channel = grpc.insecure_channel(server_string)
+            # channel = grpc.insecure_channel(server_string, options=[("grpc.service_config", json_config)])
             stub = chat_system_pb2_grpc.ChatServerStub(channel)
             server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=self.id), timeout=1)
             if server_status.status is True:
@@ -116,17 +133,27 @@ class ServerPoolManager:
                         if stub:
                             self.active_stubs[server_id] = stub
                     if stub is not None:
-                        server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=0 , start_timestamp=self.start_timestamp), timeout=0.1)
-                        if server_status.status is True:
-                            if self.connected_servers[i] is False:
-                                ## Get group info from other servers
-                                logging.info(f'server {i} connected')
-                                server_message = {}
-                                self.send_to_server(server_message, target_server_id=i, event_type=C.GET_GROUP_META_DATA)
-                            self.connected_servers[i] = True
+                        # logging.info(f'pinging server {i}')
+                        server_status = None
+                        cmd = f"timeout {C.PING_TIMEOUT} ping -bc 1 172.30.100.10{i} > /dev/null"
+                        ping_status = os.system(cmd)
+                        # print(ping_status)
+                        if self.connected_servers[i] is True or ping_status == 0:
+                            server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=0 , start_timestamp=self.start_timestamp), timeout=C.PING_TIMEOUT)
+                            if server_status.status is True:
+                                if self.connected_servers[i] is False:
+                                    ## Get group info from other servers
+                                    logging.info(f'server {i} connected')
+                                    server_message = {}
+                                    self.send_to_server(server_message, target_server_id=i, event_type=C.GET_GROUP_META_DATA)
+                                self.connected_servers[i] = True
                             # logging.info(f'ping successful to server {i}')
+                        else:
+                            self.connected_servers[i] = False
+                            # logging.info(f'ping response {ping_status}')
+                            pass
                 except Exception as e:
-                    # logging.error(f'failed to connect to {i}: {e}')
+                    logging.error(f'failed to connect to {i} {e}')
                     if self.connected_servers[i]:
                         # del self.active_stubs[i]
                         # self.channels[i].close()
