@@ -141,7 +141,7 @@ def health_check():
             state[C.SERVER_ONLINE] = False
             state[C.ACTIVE_GROUP_KEY] = None
             state[C.ACTIVE_USER_KEY] = None
-            display_manager.warn('server disconnected')
+            display_manager.error('server disconnected')
         # sleep(C.HEALTH_CHECK_INTERVAL)
         state['user_joined_event'].wait()
         state['user_joined_event'].clear()
@@ -188,6 +188,25 @@ def get_messages(change_group_event):
         try:
             start_timestamp = get_timestamp()
             for message in messages:
+                message_type = message.message_type
+                msg_dict = MessageToDict(message, preserving_proto_field_name=True)
+                if message_type == C.PARTICIPANT_LIST:
+                    existing_participant_set = set(state[C.GROUP_DATA].get('users', []))
+                    state[C.GROUP_DATA]['users'] = msg_dict['users']
+                    new_participant_set = set(msg_dict['users'])
+                    participants_left_set = existing_participant_set - new_participant_set
+                    participants_joined_set = new_participant_set - existing_participant_set
+                    display_manager.write_header(group_name=f"Group: {state.get(C.ACTIVE_GROUP_KEY)}",
+                                                    participants=f"Participants: {', '.join(set(msg_dict['users']))}")
+                    info_message = ""
+                    if len(participants_left_set) > 0:
+                        info_message += " " + ", ".join(participants_left_set) + " left the chat."
+                    if len(participants_joined_set) > 0:
+                        info_message += " " + ", ".join(participants_joined_set) + " joined the chat. "
+                    if len(info_message) > 0:
+                        info_message = f'({datetime.fromtimestamp(int(message.creation_time/10**6))})' + info_message
+                    display_manager.info(info_message)
+                    continue
                 if message.message_id not in state[C.MESSAGE_ID_TO_NUMBER_MAP]:
                     state[C.MESSAGE_NUMBER] += 1
                     # this is to look up display line number of message id
@@ -206,7 +225,6 @@ def get_messages(change_group_event):
                         state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.TEXT_MSG_IDX]] = message.message_id
                         state[C.TEXT_ID_TO_NUMBER_MAP][message.message_id] = state[C.TEXT_MSG_IDX]
 
-                msg_dict = MessageToDict(message)
                 if msg_dict.get("likes"):
                     count = sum(list(map(int, msg_dict.get("likes").values())))
                 else:
@@ -286,7 +304,7 @@ def enter_group_chat(stub, group_id, change_group_event):
             return
         group_details = stub.GetGroup(
             chat_system_pb2.Group(group_id=group_id, user_id=user_id, session_id = state[C.SESSION_ID]))
-        group_data = MessageToDict(group_details)
+        group_data = MessageToDict(group_details, preserving_proto_field_name=True)
         if group_details.status is True:
             display_manager.info(f"Successfully joined group {group_id}")
             display_manager.write_header(f"Group: {group_id}", f"Participants: {', '.join(set(group_data['users']))}")

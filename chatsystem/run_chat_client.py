@@ -160,7 +160,7 @@ def get_messages(change_group_event):
         try:
             for message in messages:
                 message_type = message.message_type
-                msg_dict = MessageToDict(message)
+                msg_dict = MessageToDict(message, preserving_proto_field_name=True)
                 if message_type == C.PARTICIPANT_LIST:
                     state[C.GROUP_DATA]['users'] = msg_dict['users']
                     logging.info('Updated participant list: ' + ",".join(msg_dict['users']))
@@ -250,7 +250,7 @@ def enter_group_chat(stub, group_id, change_group_event):
             return
         group_details = stub.GetGroup(
             chat_system_pb2.Group(group_id=group_id, user_id=user_id, session_id = state[C.SESSION_ID]))
-        group_data = MessageToDict(group_details)
+        group_data = MessageToDict(group_details, preserving_proto_field_name=True)
         if group_details.status is True:
             display_manager.info(f"Successfully joined group {group_id}")
             display_manager.write(f"Group: {group_id}")

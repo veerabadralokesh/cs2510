@@ -258,6 +258,9 @@ class DisplayManagerCurses():
             self.group_name = group_name
             self.participants = participants
         self.render_header()
+    
+    def set_message_data(self, msg_data):
+        self.message_data = msg_data
 
     def render_header(self):
         self.stdscr.addstr(0, 0, self.clear_line)

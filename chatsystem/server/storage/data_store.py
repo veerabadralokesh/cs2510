@@ -4,6 +4,7 @@ import os
 import json
 import logging
 import copy
+from collections import Counter
 from functools import lru_cache
 import server.constants as C
 from server.storage.data_manager import DataManager
@@ -100,6 +101,7 @@ class Datastore(DataManager):
                 group['updated_time'] = get_timestamp()
                 group['change_log'].append({
                     "type": C.CHANGE_LOG_USERS_UPDATE,
+                    "creation_time": get_timestamp()
                 })
                 event_group_ids.append(group_id)
                 logging.debug('group unlocked')
@@ -114,13 +116,14 @@ class Datastore(DataManager):
             logging.debug('group locked')
             user_list = group_meta_data.get('users', [])
             existing_list = self.groups[group_id]['users'].get(incoming_server_id, [])
-            if not len(existing_list + user_list):
+            if not len(existing_list + user_list) or Counter(existing_list) == Counter(user_list):
                 return False
             self.groups[group_id]['users'][incoming_server_id] = user_list
             self.groups[group_id]['updated_time'] = get_timestamp()
             logging.info(f"Group {group_id} updated")
             self.groups[group_id]['change_log'].append({
                 "type": C.CHANGE_LOG_USERS_UPDATE,
+                "creation_time": get_timestamp()
             })
             logging.debug('group unlocked')
             return True
@@ -349,7 +352,8 @@ class Datastore(DataManager):
                     elif change['type'] == C.CHANGE_LOG_USERS_UPDATE:
                         message = {
                             'users': self.expand_user_list(group_id, group.get('updated_time')),
-                            'message_type': C.PARTICIPANT_LIST
+                            'message_type': C.PARTICIPANT_LIST,
+                            'creation_time': change.get('creation_time')
                         }
                         messages_list.append(message)
                     else:
