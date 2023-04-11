@@ -42,20 +42,6 @@ class ThreadSafeDict:
             return self._state.values()
 
 
-def join_server(server_string, server_id):
-    try:
-        # print(f"Trying to connect to server: {server_string}")
-        channel = grpc.insecure_channel(server_string)
-        stub = chat_system_pb2_grpc.ChatServerStub(channel)
-        server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=server_id), timeout=1)
-        if server_status.status is True:
-            print(f"Connected to server: {server_string}")
-            return stub
-            # sleep(C.CONNECT_SERVER_INTERVAL)
-    except Exception as e:
-        # print("exception: ", e)
-        pass
-
 class ServerPoolManager:
     def __init__(self, id, file_manager: FileManager, data_store: Datastore) -> None:
         """
@@ -67,6 +53,7 @@ class ServerPoolManager:
         self.data_store = data_store
         self.num_servers = C.NUM_SERVERS
         self.call_backs = {}
+        self.channels = {}
         self.active_stubs = {}
         self.connected_servers = {}
         self.thread_events = {}
@@ -79,6 +66,7 @@ class ServerPoolManager:
         self.create_message_queues()
         self.load_queue_messages_from_disk()
         self.connect_to_servers()
+        self.data_store.register_callback(C.GET_VECTOR_TIMESTAMP, self.update_vector_timestamp)
     
     def register_callback(self, call_back_key, call_back_func):
         self.call_backs[call_back_key] = call_back_func
@@ -95,6 +83,21 @@ class ServerPoolManager:
             self.file_manager.fast_write(f"{self.id}_vector_timestamp", json.dumps(self.vector_timestamp).encode('utf-8'))
             if not message:
                 return self.vector_timestamp.copy()
+    
+    def join_server(self, server_string, server_id):
+        try:
+            # print(f"Trying to connect to server: {server_string}")
+            channel = grpc.insecure_channel(server_string)
+            stub = chat_system_pb2_grpc.ChatServerStub(channel)
+            server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=self.id), timeout=1)
+            if server_status.status is True:
+                print(f"Connected to server: {server_string}")
+                self.channels[server_id] = channel
+                return stub
+                # sleep(C.CONNECT_SERVER_INTERVAL)
+        except Exception as e:
+            # print("exception: ", e)
+            pass
 
     def ping_servers(self):
         while True:
@@ -109,7 +112,7 @@ class ServerPoolManager:
                             server_string = f'localhost:{(11999+server_id)}'
                         else:
                             server_string = C.SERVER_STRING.format(server_id)
-                        stub = join_server(server_string, self.id)
+                        stub = self.join_server(server_string, server_id)
                         if stub:
                             self.active_stubs[server_id] = stub
                     if stub is not None:
@@ -117,12 +120,18 @@ class ServerPoolManager:
                         if server_status.status is True:
                             if self.connected_servers[i] is False:
                                 ## Get group info from other servers
+                                logging.info(f'server {i} connected')
                                 server_message = {}
                                 self.send_to_server(server_message, target_server_id=i, event_type=C.GET_GROUP_META_DATA)
                             self.connected_servers[i] = True
+                            # logging.info(f'ping successful to server {i}')
                 except Exception as e:
                     # logging.error(f'failed to connect to {i}: {e}')
                     if self.connected_servers[i]:
+                        # del self.active_stubs[i]
+                        # self.channels[i].close()
+                        # del self.channels[i]
+                        logging.info(f'server {i} disconnected')
                         self.call_backs[C.SERVER_DIED_CALLBACK](i)
                     self.connected_servers[i] = False
             sleep(C.PING_INTERVAL)
@@ -146,6 +155,9 @@ class ServerPoolManager:
 
                     while True:
                         while message_queue.qsize():
+                            if self.active_stubs.get(server_id) is None:
+                                # if stub is None, don't wait for new messages
+                                break
                             queue_message = message_queue.queue[0]
                             timestamp, message = queue_message
                             # print('message', message)
@@ -161,6 +173,8 @@ class ServerPoolManager:
                                 event_type=message.get('event_type'),
                                 users=message.get('users'),
                                 server_id=message.get('server_id', self.id),
+                                vector_timestamp_2=message.get('vector_timestamp_2'),
+                                updated_time=message.get('updated_time')
                             )
                             try:
                                 status = stub.SyncMessagetoServer(server_message, timeout=0.5)
@@ -179,9 +193,9 @@ class ServerPoolManager:
                             except Exception as e:
                                 logging.error(e)
                                 break
-                        # if self.active_stubs.get(server_id) is None:
-                        #     # if stub is None, don't wait for new messages
-                        #     break
+                        if self.active_stubs.get(server_id) is None:
+                            # if stub is None, don't wait for new messages
+                            break
                         message_event.wait()
                         message_event.clear()
 
