@@ -26,3 +26,9 @@ def is_valid_message(message):
 def clean_message(message: dict):
     if 'creation_time' in message:
         message['creation_time'] = int(message['creation_time'])
+    if 'updated_time' in message:
+        message['updated_time'] = int(message['updated_time'])
+
+    if "likes" not in message:
+        message["likes"] = {}
+    

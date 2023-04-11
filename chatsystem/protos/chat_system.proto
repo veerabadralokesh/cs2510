@@ -91,4 +91,6 @@ message ServerMessage {
     repeated string users = 10;
     int32 server_id = 11;
     string destination_server_id = 12;
+    map<string, int32> vector_timestamp_2 = 13;
+    uint64 updated_time = 14;
 }

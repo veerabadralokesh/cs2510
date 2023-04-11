@@ -447,6 +447,8 @@ def run():
                 server_string = user_input[2:].strip()
                 if server_string == '':
                     server_string = C.DEFAULT_SERVER_CONNECTION_STRING
+                elif server_string in ['1', '2', '3', '4', '5']:
+                    server_string = f'localhost:{11999+int(server_string)}'
                 stub = join_server(server_string)
 
             # exit mode: q 

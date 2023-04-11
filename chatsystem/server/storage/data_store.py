@@ -8,7 +8,7 @@ from functools import lru_cache
 import server.constants as C
 from server.storage.data_manager import DataManager
 from server.storage.file_manager import FileManager
-from server.storage.utils import is_valid_message, get_timestamp, get_unique_id
+from server.storage.utils import is_valid_message, get_timestamp, get_unique_id, clean_message
 
 class ServerCollection():
     def __init__(self, initial={}):
@@ -56,11 +56,15 @@ class Datastore(DataManager):
         self.messages = ServerCollection(messages)
         self.sessions = ServerCollection(sessions)
         self.groups = ServerCollection(groups)
+        self.call_backs = {}
         self.loaded_data = False
         self.file_manager = file_manager
         self.recover_data_from_disk()
 
         # self.reorder_messages()
+    
+    def register_callback(self, call_back_key, call_back_func):
+        self.call_backs[call_back_key] = call_back_func
     
     def get_group_lock(self, group_id):
         lock = self.locks.get(group_id)
@@ -88,6 +92,7 @@ class Datastore(DataManager):
         event_group_ids = []
         for group_id, group in self.groups.items():
             with self.get_group_lock(group_id):
+                logging.debug('group locked')
                 group = self.groups.get(group_id)
                 if not group.get('users'):
                     continue
@@ -97,6 +102,7 @@ class Datastore(DataManager):
                     "type": C.CHANGE_LOG_USERS_UPDATE,
                 })
                 event_group_ids.append(group_id)
+                logging.debug('group unlocked')
         return event_group_ids
 
     
@@ -105,6 +111,7 @@ class Datastore(DataManager):
             creation_time = group_meta_data.get('creation_time')
             self.create_group(group_id, users={}, creation_time=creation_time)
         with self.get_group_lock(group_id=group_id):
+            logging.debug('group locked')
             user_list = group_meta_data.get('users', [])
             existing_list = self.groups[group_id]['users'].get(incoming_server_id, [])
             if not len(existing_list + user_list):
@@ -115,14 +122,11 @@ class Datastore(DataManager):
             self.groups[group_id]['change_log'].append({
                 "type": C.CHANGE_LOG_USERS_UPDATE,
             })
+            logging.debug('group unlocked')
             return True
 
 
-    def compare_timestamps(self, message1, message2):
-        server1 = message1.get('server_id')
-        server2 = message2.get('server_id')
-        timestamp1 = message1.get('vector_timestamp')
-        timestamp2 = message2.get('vector_timestamp')
+    def compare_vector_timestamps(self, timestamp1, timestamp2):
         comparison_dict = {"less":0, "greater":0, "equal":0}
         for key in timestamp1:
             if timestamp1[key] < timestamp2[key]:
@@ -135,9 +139,21 @@ class Datastore(DataManager):
             return 0 # return (message1, message2) # message1 is older than message2
         if comparison_dict["less"] == 0 and comparison_dict["greater"] > 0:
             return 1 # return (message2, message1) # message2 is older than message1
-        if server1 < server2:
-            return 0 # return (message1, message2) # message1 is older than message2
-        return 1 #(message2, message1) # message2 is older than message1
+
+    def determine_message_order(self, message1, message2, vector_timestamp_key='vector_timestamp', user_server_ids=True):
+        server1 = message1.get('server_id')
+        server2 = message2.get('server_id')
+        timestamp1 = message1.get(vector_timestamp_key)
+        timestamp2 = message2.get(vector_timestamp_key)
+        timestamp_order = self.compare_vector_timestamps(timestamp1, timestamp2)
+        if timestamp_order is not None:
+            return timestamp_order
+        if user_server_ids:
+            if server1 < server2:
+                return 0 # return (message1, message2) # message1 is older than message2
+            return 1 #(message2, message1) # message2 is older than message1
+        else:
+            return -1
 
     def binary_search(self, message_id_list, new_message):
         left = 0
@@ -146,7 +162,7 @@ class Datastore(DataManager):
             return left
         while left < right:
             mid = (left + right)//2
-            greater = self.compare_timestamps(new_message, self.messages[message_id_list[mid]])
+            greater = self.determine_message_order(new_message, self.messages[message_id_list[mid]])
             if greater == 0:
                 right = mid
             elif greater == 1:
@@ -155,11 +171,11 @@ class Datastore(DataManager):
         
     def insert_new_message(self, group_id, message_id, message):
         with self.get_group_lock(group_id):
-            message["likes"] = {}
+            logging.debug('group locked')
             self.messages[message_id] = message
             message_ids = self.groups[group_id]["message_ids"]
             ## If new message timestamp is after the last message add it to the end
-            if len(message_ids) == 0 or self.compare_timestamps(self.messages[message_ids[-1]], message) == 0:
+            if len(message_ids) == 0 or self.determine_message_order(self.messages[message_ids[-1]], message) == 0:
                 self.groups[group_id]["message_ids"].append(message_id)
                 self.groups[group_id]['change_log'].append({
                     "message_id": message_id,
@@ -178,6 +194,7 @@ class Datastore(DataManager):
                 })
                 self.file_manager.append(f'{group_id}_change_log.log', f"{C.CHANGE_LOG_INSERT}:{message_id}:{previous_message_id}")
             self.file_manager.append(f'{group_id}_messages.txt', message)
+            logging.debug('group unlocked')
             
     def save_message(self, message):
         """
@@ -185,14 +202,20 @@ class Datastore(DataManager):
         """
         if not is_valid_message(message):
             raise Exception("Invalid Message")
+        clean_message(message)
         message_id = message['message_id']
         group_id = message["group_id"]
         # message["creation_time"] = int(message["creation_time"])
+        if not self.get_group(group_id):
+            self.create_group(group_id)
+        message_type = message["message_type"]
 
-        if message["message_type"] in (C.NEW, C.USER_JOIN, C.USER_LEFT):
+        if message_type in (C.NEW, C.USER_JOIN, C.USER_LEFT):
+            if message_id in self.messages:
+                return
             self.insert_new_message(group_id, message_id, message)
 
-        # elif message["message_type"] in C.APPEND_TO_CHAT_COMMANDS:
+        # elif message_type in C.APPEND_TO_CHAT_COMMANDS:
         #     with self.get_group_lock(group_id):
         #         original_message = self.messages[message_id]
         #         original_message["text"].extend(message["text"])
@@ -200,20 +223,64 @@ class Datastore(DataManager):
         #         self.file_manager.append(f'{group_id}_messages.txt', original_message)
         else:
             # like / unlike message_type
+            original_message = self.messages.get(message_id)
+            if original_message is None:
+                self.insert_new_message(group_id, message_id, message)
+                logging.debug('group unlocked')
+                return message
             with self.get_group_lock(group_id):
-                original_message = self.messages[message_id]
-                for key, val in message["likes"].items():
-                    if original_message["user_id"] == key:
-                        return
-                    original_message["likes"][key] = val
-                # self.groups[group_id]["updated_ids"].append(message_id)
+                logging.debug('group locked')
+                updated = self.resolve_message_update_causality(original_message, message)
+                if not updated:
+                    return
+
+                original_message['message_type'] = message_type
+                
                 self.groups[group_id]['change_log'].append({
                     "message_id": message_id,
                     "type": C.CHANGE_LOG_UPDATE,
                 })
                 self.file_manager.append(f'{group_id}_messages.txt', original_message)
+                logging.debug('group unlocked')
+                return original_message
 
         return message
+    
+    def resolve_message_update_causality(self, original_message, message):
+
+        if 'vector_timestamp_2' not in message:
+            message['vector_timestamp_2'] = message['vector_timestamp']
+        if 'updated_time' not in message:
+            message['updated_time'] = message['creation_time']
+        if 'vector_timestamp_2' not in original_message:
+            original_message['vector_timestamp_2'] = original_message['vector_timestamp']
+        if 'updated_time' not in original_message:
+            original_message['updated_time'] = original_message['creation_time']
+        
+        omvt2 = original_message.get('vector_timestamp_2')
+        mvt2 = message.get('vector_timestamp_2')
+        original_message_before_message = self.compare_vector_timestamps(omvt2, mvt2)
+        if original_message_before_message == 0:
+            original_message["likes"] = message["likes"]
+            original_message['updated_time'] = message.get('updated_time')
+            original_message['vector_timestamp_2'] = message.get('vector_timestamp_2') ##self.call_backs[C.GET_VECTOR_TIMESTAMP]()
+            return True
+        elif original_message_before_message == 1:
+            return False
+        else:
+            for key, val in message["likes"].items():
+                original_val = original_message["likes"][key]
+                if val == original_val:
+                    continue
+                if original_val == 1 and val == 0:
+                    original_message["likes"][key] = 0
+                    continue
+                if original_val == 0 and val == 1 and original_message.get('updated_time') < message.get('updated_time'):
+                    original_message["likes"][key] = 1
+
+            original_message['updated_time'] = message['updated_time']
+            original_message['vector_timestamp_2'] = self.call_backs[C.GET_VECTOR_TIMESTAMP]()
+            return True
             
     def save_session_info(self, session_id, user_id, group_id=None, is_active=True, context=None):
         session = {
@@ -260,6 +327,7 @@ class Datastore(DataManager):
             return []
 
         with self.get_group_lock(group_id):
+            logging.debug('group locked')
             # last_index = len(all_msg_ids)
             # updated_ids = None
             # if updated_idx is not None:
@@ -291,6 +359,7 @@ class Datastore(DataManager):
                 message_ids = all_msg_ids[start_index:]
                 messages_list = self.get_message_list(message_ids)
             change_log_index = len(group.get('change_log'))
+            logging.debug('group unlocked')
 
         return change_log_index, messages_list
     
@@ -299,6 +368,7 @@ class Datastore(DataManager):
     
     def create_group(self, group_id, users={}, creation_time=get_timestamp()):
         with self.get_group_lock(group_id=group_id):
+            logging.debug('group locked')
             group = {
                 'group_id': group_id,
                 'users': users,
@@ -308,18 +378,22 @@ class Datastore(DataManager):
                 'updated_time': creation_time
             }
             self.groups[group_id] = group
-            logging.info(f"Group {group_id} created")
+            logging.debug(f"Group {group_id} created")
             self.file_manager.write(f'{group_id}.json', group)
+            logging.debug('group unlocked')
             return group
 
     def add_user_to_group(self, group_id, user_id, server_id):
         # print("inside add_user_to_group group id", group_id, "users", user_id)
+        print("waiting for group lock")
         with self.get_group_lock(group_id):
+            print("acquired group lock")
             if server_id not in self.groups[group_id]['users']:
                 self.groups[group_id]['users'][server_id] = []
             self.groups[group_id]['users'][server_id].append(user_id)
             self.groups[group_id]['updated_time'] = get_timestamp()
-            logging.info(f"{user_id} joined {group_id}")
+            logging.debug(f"{user_id} joined {group_id}")
+            logging.debug('group unlocked')
         # self.save_message({"group_id": group_id, 
         # "user_id": user_id,
         # "creation_time": get_timestamp(),
@@ -329,12 +403,15 @@ class Datastore(DataManager):
     
     def remove_user_from_group(self, group_id, user_id, server_id):
         with self.get_group_lock(group_id):
+            logging.debug('group locked')
             if user_id not in self.groups[group_id]['users'].get(server_id, []):
                 return
             index = self.groups[group_id]['users'][server_id].index(user_id)
             del self.groups[group_id]['users'][server_id][index]
             self.groups[group_id]['updated_time'] = get_timestamp()
-            logging.info(f"{user_id} removed from {group_id}")
+            logging.debug(f"{user_id} removed from {group_id}")
+        
+        logging.debug('group unlocked')
 
     def recover_data_from_disk(self):
         all_files = self.file_manager.list_files()
