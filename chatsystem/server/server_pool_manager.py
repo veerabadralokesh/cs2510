@@ -12,21 +12,21 @@ from server.storage.data_store import Datastore
 from server.storage.utils import get_timestamp
 from queue import Queue
 
-# json_config = json.dumps(
-#     {
-#         "methodConfig": [
-#             {
-#                 "retryPolicy": {
-#                     "maxAttempts": 5,
-#                     "initialBackoff": "0.5s",
-#                     "maxBackoff": "10s",
-#                     "backoffMultiplier": 1.5,
-#                     "retryableStatusCodes": ["UNAVAILABLE"],
-#                 },
-#             }
-#         ]
-#     }
-# )
+json_config = json.dumps(
+    {
+        "methodConfig": [
+            {
+                "retryPolicy": {
+                    "maxAttempts": 5,
+                    "initialBackoff": "0.5s",
+                    "maxBackoff": "10s",
+                    "backoffMultiplier": 1.5,
+                    "retryableStatusCodes": ["UNAVAILABLE", "UNKNOWN"],
+                },
+            }
+        ]
+    }
+)
 
 class ThreadSafeDict:
     def __init__(self, initial={}):
@@ -72,6 +72,7 @@ class ServerPoolManager:
         self.channels = {}
         self.active_stubs = {}
         self.connected_servers = {}
+        self.grpc_timedout_count = {}
         self.thread_events = {}
         self.message_queues = {}
         self.vector_timestamp = {str(i): 0 for i in range(1, C.NUM_SERVERS+1)}
@@ -103,8 +104,8 @@ class ServerPoolManager:
     def join_server(self, server_string, server_id):
         try:
             # print(f"Trying to connect to server: {server_string}")
-            channel = grpc.insecure_channel(server_string)
-            # channel = grpc.insecure_channel(server_string, options=[("grpc.service_config", json_config)])
+            # channel = grpc.insecure_channel(server_string)
+            channel = grpc.insecure_channel(server_string, options=[("grpc.service_config", json_config)])
             stub = chat_system_pb2_grpc.ChatServerStub(channel)
             server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=self.id), timeout=1)
             if server_status.status is True:
@@ -119,11 +120,13 @@ class ServerPoolManager:
     def ping_servers(self):
         while True:
             for i in range(1, self.num_servers + 1):
+                ping_status = 1
                 try:
                     if self.id == i: 
                         continue
                     stub = self.active_stubs.get(i)
                     if stub is None:
+                        self.grpc_timedout_count[i] = 0
                         server_id = i
                         if C.USE_DIFFERENT_PORTS:
                             server_string = f'localhost:{(11999+server_id)}'
@@ -146,6 +149,7 @@ class ServerPoolManager:
                                     logging.info(f'server {i} connected')
                                     server_message = {}
                                     self.send_to_server(server_message, target_server_id=i, event_type=C.GET_GROUP_META_DATA)
+                                self.grpc_timedout_count[i] = 0
                                 self.connected_servers[i] = True
                             # logging.info(f'ping successful to server {i}')
                         else:
@@ -160,6 +164,12 @@ class ServerPoolManager:
                         # del self.channels[i]
                         logging.info(f'server {i} disconnected')
                         self.call_backs[C.SERVER_DIED_CALLBACK](i)
+                    else:
+                        if ping_status == 0:
+                            self.grpc_timedout_count[i] += 1
+                        if self.grpc_timedout_count[i] >= 3:
+                            logging.info(f'closing inactive connection to the server {i}')
+                            del self.active_stubs[i]
                     self.connected_servers[i] = False
             sleep(C.PING_INTERVAL)
 
