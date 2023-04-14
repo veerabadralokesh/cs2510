@@ -3,7 +3,7 @@ import argparse
 import logging
 import threading
 from concurrent import futures
-
+import copy
 import chat_system_pb2
 import chat_system_pb2_grpc
 import grpc
@@ -76,7 +76,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
     def GetUser(self, request, context):
         user_id = request.user_id
-        logging.info(f"Login request form user: {user_id}")
+        logging.info(f"Login request from user: {user_id}")
         session_id = get_unique_id()
         status = chat_system_pb2.Status(status=True, statusMessage=session_id)
         self.data_store.save_session_info(session_id, user_id)
@@ -84,7 +84,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
     
     def LogoutUser(self, request, context):
         user_id = request.user_id
-        logging.info(f"Logout request form user: {user_id}")
+        logging.info(f"Logout request from user: {user_id}")
         status = chat_system_pb2.Status(status=True, statusMessage="")
         self.data_store.save_session_info(request.session_id, user_id, is_active=False)
         return status
@@ -236,9 +236,12 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         server_id = message['server_id']
         server_view = message.get('server_view', None)
         server_timestamps = message.get('server_timestamps', None)
+        replay_server_id = message.get('replay_server_id', '0')
         # print(server_id, server_timestamps)
         if server_id and server_view and server_timestamps:
-            self.spm.send_msg_to_recovered_servers(server_id, server_view, server_timestamps)
+            self.spm.send_msg_to_recovered_servers(server_id, server_view, server_timestamps, replay_server_id)
+            # if replay_server_id != '0':
+            #     logging.info('returning from Ping')
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
 
@@ -257,11 +260,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         message = MessageToDict(request, preserving_proto_field_name=True)
         clean_message(message)
+        message_copy = copy.deepcopy(message)
         event_type = message['event_type']
         message_type = message.get('message_type')
         group_id = message.get('group_id')
         user_id = message.get('user_id')
         incoming_server_id = message["server_id"]
+
+        # logging.info('msg received')
 
         self.spm.update_vector_timestamp(message)
 
@@ -275,14 +281,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             # trigger new message event i.e. calling getmessages
             # self.new_message_event.set()
             self.get_group_message_event(group_id).set()
-            self.spm.log_message(message)
+            self.spm.log_message(message_copy)
         elif event_type == C.GROUP_EVENT:
             users = message.get('users', {})
             creation_time = message.get('creation_time')
             if not self.data_store.get_group(group_id):
                 # print(f'creating group {group_id}')
                 self.data_store.create_group(group_id, users, creation_time)
-            self.spm.log_message(message)
+            self.spm.log_message(message_copy)
         elif event_type == C.GET_GROUP_META_DATA:
             all_groups_data = self.data_store.get_groups_meta_data()
             for group_meta in all_groups_data:

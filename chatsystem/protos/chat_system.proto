@@ -37,6 +37,7 @@ message PingMessage {
     int64 start_timestamp = 2;
     map<string, int64> server_timestamps = 3;
     map<string, bool> server_view = 4;
+    string replay_server_id = 5;
 }
 
 message ActiveSession {

@@ -86,6 +86,8 @@ class ServerPoolManager:
         self.connected_server_views = ThreadSafeDict()
         self.grpc_timedout_count = {}
         self.out_of_sync_servers = ThreadSafeDict()
+        self.sync_from_server = ThreadSafeDict()
+        self.sync_request_timestamps = ThreadSafeDict()
         self.thread_events = {}
         self.message_queues = {}
         self.recieved_server_timestamps = ThreadSafeDict()
@@ -136,10 +138,10 @@ class ServerPoolManager:
     def ping_servers(self):
         while True:
             for i in self.server_ids:
+                if self.id == i: 
+                    continue
                 ping_status = 1
                 try:
-                    if self.id == i: 
-                        continue
                     stub = self.active_stubs.get(i)
                     if stub is None:
                         self.grpc_timedout_count[i] = 0
@@ -164,11 +166,31 @@ class ServerPoolManager:
                         # print(self.connected_servers.get_dict())
                         
                         if self.connected_servers[i] is True or ping_status == 0:
+                            replay_server_id = '0'
+                            current_timestamp = get_timestamp()
+                            # if self.sync_from_server.get(i):
+                                # logging.info(f'id: {id(self.out_of_sync_servers)}')
+                            
+                            if self.sync_from_server.get(i) is not None:
+                                replay_server_id = self.sync_from_server[i]
+                                # logging.info(f'{self.sync_from_server}, {(self.out_of_sync_servers)}, {self.sync_request_timestamps.get(replay_server_id, 0) < current_timestamp - C.REPLAY_MSG_LOG_INTERVAL_MICROS}, ')
+                                if self.connected_servers[replay_server_id] is False and self.out_of_sync_servers[replay_server_id] is True:
+                                    if self.sync_request_timestamps[replay_server_id] < current_timestamp - C.REPLAY_MSG_LOG_INTERVAL_MICROS:
+                                        self.sync_request_timestamps[replay_server_id] = current_timestamp
+                                        self.out_of_sync_servers[replay_server_id] = False
+                                        # logging.info('requesting messages in this ping')
+                                    else:
+                                        replay_server_id = '0'
+                                else:
+                                    self.sync_from_server[i] = None
+                                    replay_server_id = '0'
+                            
                             server_status = stub.Ping(chat_system_pb2.PingMessage(
                                 server_id=self.id,
                                 start_timestamp=self.start_timestamp,
                                 server_timestamps=self.recieved_server_timestamps.get_dict(),
-                                server_view=self.connected_servers.get_dict()
+                                server_view=self.connected_servers.get_dict(),
+                                replay_server_id=replay_server_id
                             ), timeout=C.PING_TIMEOUT)
                             # print(server_status)
                             if server_status.status is True:
@@ -185,8 +207,8 @@ class ServerPoolManager:
                             # logging.info(f'ping response {ping_status}')
                             pass
                 except Exception as e:
-                    logging.error(f'failed to connect to {i}')
-                    # logging.error(f'failed to connect to {i} {e}')
+                    # logging.error(f'failed to connect to {i}')
+                    logging.error(f'failed to connect to {i} {e}')
                     # raise e
                     if self.connected_servers[i]:
                         # del self.active_stubs[i]
@@ -251,7 +273,7 @@ class ServerPoolManager:
                                 status = stub.SyncMessagetoServer(server_message, timeout=0.5)
                                 if status.status:
                                     message_queue.get(0)
-                                    if timestamp > 0:
+                                    if timestamp > 0 and source_server_id == self.id:
                                         self.queue_timestamp_dict[server_id] = timestamp
                                         if timestamp:
                                             self.file_manager.fast_write(f"{self.id}/{server_id}_last_sent_timestamp", json.dumps(timestamp).encode('utf-8'))
@@ -278,23 +300,57 @@ class ServerPoolManager:
                 del self.active_stubs[server_id]
         pass
 
-    def send_msg_to_recovered_servers(self, recovered_server_id, server_view, server_timestamps):
+    def send_msg_to_recovered_servers(self, recovered_server_id, server_view, server_timestamps, replay_server_id):
 
+        ## Update server view for recovered server
         if server_view:
             recovered_server_view = self.connected_server_views.get(recovered_server_id)
             if recovered_server_view:
                 for key, value in server_view.items():
                     recovered_server_view[key] = value
+        ## Update received server timestamps for recovered server
         if server_timestamps:
             recovered_server_received_timestamps = self.ping_server_timestamps.get(recovered_server_id)
             if recovered_server_received_timestamps:
                 for key, value in server_timestamps.items():
                     recovered_server_received_timestamps[key] = int(value)
-                    if int(value) > self.recieved_server_timestamps[key] and self.connect_to_servers[key] is False and key != self.id:
-                        self.out_of_sync_servers[key] = True
-        self.thread_events[recovered_server_id].set()
-        # if server_view:
+                    if key != self.id:
+                        if int(value) > self.recieved_server_timestamps[key]:
+                            if key not in self.sync_from_server.values() and self.connected_servers[key] is False:
+                                # logging.info(f"{self.id}, {key}, {value}, {recovered_server_id}, {self.recieved_server_timestamps[key]}")
+                                # logging.info( )
+                                self.out_of_sync_servers[key] = True
+                                # logging.info(f'id ping: {id(self.out_of_sync_servers)}')
+                                self.sync_from_server[recovered_server_id] = key
+                        # else:
+                        #     self.out_of_sync_servers[key] = False
+                        # if replay_server_id != '0':
+                        #     logging.info(f"{self.id}, {replay_server_id}, {key}, {value}, {self.recieved_server_timestamps[key]}")
+                        
+            if replay_server_id != '0' and replay_server_id != self.id:
+                self.send_replay_messages(target_server_id=recovered_server_id, replay_server_id=replay_server_id, last_received_timestamp=int(server_timestamps[replay_server_id]))
+        ## if unsent messages present in queue for recovered server, send those messages
+        if self.delete_timestamp_queues.get(recovered_server_id).qsize():
+            self.thread_events[recovered_server_id].set()
+    
+    def send_replay_messages(self, target_server_id, replay_server_id, last_received_timestamp):
+        logging.info(f"Sending replay messages of {replay_server_id} to {target_server_id} after timestamp {last_received_timestamp}")
+        replay_msg_files = self.file_manager.list_files(path=f"{replay_server_id}/", fast=True)
+        replay_msg_files.sort()
 
+        for file in replay_msg_files:
+            if not file.endswith('_timestamp'):
+                timestamp = int(file)
+                # logging.info(f'{timestamp}, {timestamp > last_received_timestamp}')
+                if timestamp > last_received_timestamp:
+                    # logging.info(f'{timestamp}, {target_server_id}')
+                    message = json.loads(self.file_manager.fast_read(f"{replay_server_id}/{file}"))
+                    if 'server_id' not in message:
+                        message['server_id'] = replay_server_id
+                    queue_object = (timestamp, message)
+                    self.message_queues[target_server_id].put(queue_object)
+                    self.thread_events[target_server_id].set()
+        
         pass
 
     def connect_to_servers(self):
@@ -362,6 +418,7 @@ class ServerPoolManager:
             self.queue_timestamp_dict[i] = 0
             self.connected_servers[i] = False
             self.recieved_server_timestamps[i] = 0
+            self.sync_request_timestamps[i] = 0
             
     def load_queue_messages_from_disk(self):
         for sid in self.server_ids:
@@ -440,8 +497,9 @@ class ServerPoolManager:
     def log_message(self, message):
         
         server_id = str(message['server_id'])
-        server_time = message['server_time']
+        server_time = int(message['server_time'])
 
+        # logging.info(f'{server_time}, {self.recieved_server_timestamps[server_id]}, {server_time > self.recieved_server_timestamps[server_id]}')
         if server_time > self.recieved_server_timestamps[server_id]:
             self.recieved_server_timestamps[server_id] = server_time
             self.file_manager.fast_write(f"{self.id}/{server_id}_last_recieved_timestamp", json.dumps(server_time).encode('utf-8'))

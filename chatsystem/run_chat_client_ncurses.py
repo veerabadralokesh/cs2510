@@ -273,7 +273,7 @@ def get_user_connection(stub, user_id):
         check_state(C.USER_LOGIN_CHECK)
         if state.get(C.ACTIVE_USER_KEY) is not None:
             if state.get(C.ACTIVE_USER_KEY) != user_id:
-                print(state[C.ACTIVE_USER_KEY])
+                # print(state[C.ACTIVE_USER_KEY])
                 logout_user(user_id=state[C.ACTIVE_USER_KEY])
                 display_manager.set_user(user_id=C.INPUT_PROMPT)
             else:

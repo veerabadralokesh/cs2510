@@ -4,6 +4,8 @@ import os
 NUM_SERVERS = 5
 SERVER_IDS = [str(i) for i in range(1, NUM_SERVERS+1)]
 
+REPLAY_MSG_LOG_INTERVAL_MICROS = 1_000_000 * 10
+
 STORE_DATA_ON_FILE_SYSTEM = True
 
 DATA_STORE_FILE_DIR_PATH = os.path.join(os.path.expanduser('~'), 'chat_server_data', 'chat_server{}')
