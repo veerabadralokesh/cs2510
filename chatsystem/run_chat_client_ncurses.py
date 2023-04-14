@@ -239,6 +239,7 @@ def get_messages(change_group_event):
                 #  if message_type : 
                 text_idx = state[C.TEXT_ID_TO_NUMBER_MAP][message.message_id]
                 display_manager.write(msg_indx, f"{text_idx}. {message.user_id}: {' '.join(message.text)}{like_text}")
+                state[C.MESSAGES][message.message_id] = msg_dict
         except grpc.RpcError as rpc_error:
             display_manager.debug(rpc_error)
         except Exception as e:
@@ -510,8 +511,13 @@ def run():
                 if not message_number.isdigit():
                     raise Exception("Invalid command")
                 message_number = int(message_number)
-                post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
-                display_manager.info('')
+                message_id=state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number]
+                message = state[C.MESSAGES][message_id]
+                if message.get('user_id') == state[C.ACTIVE_USER_KEY]:
+                    display_manager.info("You can't like/unlike your own message")
+                else:
+                    post_message(None, post_message_queue, post_message_event, message_number, message_type=command)
+                    display_manager.info('')
 
             # typing mode & also implement get messages mode
             elif command in C.APPEND_TO_CHAT_COMMANDS:
