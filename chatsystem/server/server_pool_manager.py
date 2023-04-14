@@ -476,12 +476,15 @@ class ServerPoolManager:
             message['event_type'] = event_type
         if 'creation_time' not in message:
             message['creation_time'] = get_timestamp()
+        if 'server_time' not in message:
+            message['server_time'] = self.get_unique_timestamp()
 
     def send_msg_to_connected_servers(self, message, event_type=C.MESSAGE_EVENT):
         self.check_message(message, event_type)
-        timestamp = self.get_unique_timestamp()
+        # timestamp = self.get_unique_timestamp()
         # message['event_type'] = event_type
-        message['server_time'] = timestamp
+        # message['server_time'] = timestamp
+        timestamp = message['server_time']
         message['server_id'] = self.id
         queue_object = (timestamp, message)
         for i in self.server_ids:
