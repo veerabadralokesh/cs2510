@@ -33,10 +33,10 @@ service ChatServer {
 message BlankMessage {}
 
 message PingMessage {
-    int32 server_id = 1;
+    string server_id = 1;
     int64 start_timestamp = 2;
-    map<string, int32> server_timestamps = 3;
-    map<string, string> server_view = 4;
+    map<string, int64> server_timestamps = 3;
+    map<string, bool> server_view = 4;
 }
 
 message ActiveSession {
@@ -90,7 +90,7 @@ message ServerMessage {
     map<string, int32> vector_timestamp = 8;
     string event_type = 9;
     repeated string users = 10;
-    int32 server_id = 11;
+    string server_id = 11;
     string destination_server_id = 12;
     map<string, int32> vector_timestamp_2 = 13;
     uint64 updated_time = 14;

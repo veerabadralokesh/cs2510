@@ -231,9 +231,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         return status
     
     def Ping(self, request, context):
-        server_id = request.server_id
-        if server_id:
-            self.spm.send_msg_to_recovered_servers(server_id)
+        # print(request)
+        message = MessageToDict(request, preserving_proto_field_name=True)
+        server_id = message['server_id']
+        server_view = message.get('server_view', None)
+        server_timestamps = message.get('server_timestamps', None)
+        # print(server_id, server_timestamps)
+        if server_id and server_view and server_timestamps:
+            self.spm.send_msg_to_recovered_servers(server_id, server_view, server_timestamps)
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         return status
 
@@ -270,14 +275,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             # trigger new message event i.e. calling getmessages
             # self.new_message_event.set()
             self.get_group_message_event(group_id).set()
-            # self.spm.log_message(message)
+            self.spm.log_message(message)
         elif event_type == C.GROUP_EVENT:
             users = message.get('users', {})
             creation_time = message.get('creation_time')
             if not self.data_store.get_group(group_id):
                 # print(f'creating group {group_id}')
                 self.data_store.create_group(group_id, users, creation_time)
-            # self.spm.log_message(message)
+            self.spm.log_message(message)
         elif event_type == C.GET_GROUP_META_DATA:
             all_groups_data = self.data_store.get_groups_meta_data()
             for group_meta in all_groups_data:
@@ -294,7 +299,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
 
 def get_args():
     parser = argparse.ArgumentParser(description="Script for running CS 2510 Project 2 servers")
-    parser.add_argument('-id', type=int, help='Server Number', required=True)
+    parser.add_argument('-id', type=str, help='Server Number', required=True)
     args = parser.parse_args()
     print(args)
     return args
@@ -303,6 +308,8 @@ def get_args():
 def serve():
     data_store = None
     args = get_args()
+    if args.id not in C.SERVER_IDS:
+        raise Exception("Invalid server id")
     try:
         file_manager = FileManager(root=C.DATA_STORE_FILE_DIR_PATH.format(args.id))
         data_store = Datastore(file_manager, server_id=args.id)
@@ -312,7 +319,7 @@ def serve():
             ChatServerServicer(data_store, spm, file_manager, args.id), server
         )
         if C.USE_DIFFERENT_PORTS:
-            id = args.id
+            id = int(args.id)
             server.add_insecure_port(f'[::]:{(11999+id)}')
             print(f"Server [::]:{(11999+id)} started")
         else:

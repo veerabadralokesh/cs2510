@@ -9,7 +9,7 @@ class FileManager:
         self.root = root
         self.fast_root = os.path.join(root, "cache")
         os.makedirs(self.fast_root, exist_ok=True)
-        for i in range(1, C.NUM_SERVERS+1):
+        for i in C.SERVER_IDS:
             os.makedirs(os.path.join(self.fast_root, str(i)), exist_ok=True)
 
     

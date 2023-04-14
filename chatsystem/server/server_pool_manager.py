@@ -29,9 +29,12 @@ json_config = json.dumps(
 )
 
 class ThreadSafeDict:
-    def __init__(self, initial={}):
+    def __init__(self):
         self._lock = threading.Lock()
-        self._state = initial
+        self._state: dict = {}
+
+    def __iter__(self):
+        return self._state.__iter__()
 
     def __setitem__(self, key, value):
         with self._lock:
@@ -47,15 +50,21 @@ class ThreadSafeDict:
     def __str__(self) -> str:
         return self._state.__str__()
 
-    def get(self, key):
-        return self._state.get(key)
+    def get(self, key, default=None):
+        with self._lock:
+            return self._state.get(key, default)
     
     def get_dict(self):
-        return self._state
+        with self._lock:
+            return self._state.copy()
     
     def values(self):
         with self._lock:
             return self._state.values()
+    
+    def keys(self):
+        with self._lock:
+            return self._state.keys()
 
 
 class ServerPoolManager:
@@ -68,15 +77,22 @@ class ServerPoolManager:
         self.file_manager = file_manager
         self.data_store = data_store
         self.num_servers = C.NUM_SERVERS
+        self.server_ids = C.SERVER_IDS
+        self.server_ids.sort(key=lambda x: x!=self.id)
         self.call_backs = {}
         self.channels = {}
         self.active_stubs = {}
-        self.connected_servers = {}
+        self.connected_servers = ThreadSafeDict()
+        self.connected_server_views = ThreadSafeDict()
         self.grpc_timedout_count = {}
+        self.out_of_sync_servers = ThreadSafeDict()
         self.thread_events = {}
         self.message_queues = {}
-        self.vector_timestamp = {str(i): 0 for i in range(1, C.NUM_SERVERS+1)}
-        self.delete_timestamp_queue = Queue()
+        self.recieved_server_timestamps = ThreadSafeDict()
+        self.ping_server_timestamps = ThreadSafeDict()
+        self.vector_timestamp = {i: 0 for i in self.server_ids}
+        # self.delete_timestamp_queue = Queue()
+        self.delete_timestamp_queues = {i: Queue() for i in self.server_ids}
         self.vector_timestamp_lock = threading.Lock()
         self.message_timestamp_lock = threading.Lock()
         self.queue_timestamp_dict = ThreadSafeDict()
@@ -97,7 +113,7 @@ class ServerPoolManager:
                     self.vector_timestamp[key] = max(self.vector_timestamp[key], message.get('vector_timestamp')[key])
                 # self.vector_timestamp = list(map(max, zip(self.vector_timestamp, message.get('vector_timestamp'))))
             self.vector_timestamp[str(self.id)] += 1
-            self.file_manager.fast_write(f"{self.id}_vector_timestamp", json.dumps(self.vector_timestamp).encode('utf-8'))
+            self.file_manager.fast_write(f"{self.id}/{self.id}_vector_timestamp", json.dumps(self.vector_timestamp).encode('utf-8'))
             if not message:
                 return self.vector_timestamp.copy()
     
@@ -107,7 +123,7 @@ class ServerPoolManager:
             # channel = grpc.insecure_channel(server_string)
             channel = grpc.insecure_channel(server_string, options=[("grpc.service_config", json_config)])
             stub = chat_system_pb2_grpc.ChatServerStub(channel)
-            server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=self.id), timeout=1)
+            server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=self.id), timeout=C.PING_TIMEOUT)
             if server_status.status is True:
                 print(f"Connected to server: {server_string}")
                 self.channels[server_id] = channel
@@ -119,7 +135,7 @@ class ServerPoolManager:
 
     def ping_servers(self):
         while True:
-            for i in range(1, self.num_servers + 1):
+            for i in self.server_ids:
                 ping_status = 1
                 try:
                     if self.id == i: 
@@ -129,7 +145,7 @@ class ServerPoolManager:
                         self.grpc_timedout_count[i] = 0
                         server_id = i
                         if C.USE_DIFFERENT_PORTS:
-                            server_string = f'localhost:{(11999+server_id)}'
+                            server_string = f'localhost:{(11999+int(server_id))}'
                         else:
                             server_string = C.SERVER_STRING.format(server_id)
                         stub = self.join_server(server_string, server_id)
@@ -138,11 +154,23 @@ class ServerPoolManager:
                     if stub is not None:
                         # logging.info(f'pinging server {i}')
                         server_status = None
-                        cmd = f"timeout {C.PING_TIMEOUT} ping -bc 1 172.30.100.10{i} > /dev/null"
-                        ping_status = os.system(cmd)
+                        if C.USE_DIFFERENT_PORTS:
+                            ping_status = 0
+                        else:
+                            cmd = f"timeout {C.PING_TIMEOUT} ping -bc 1 172.30.100.10{i} > /dev/null"
+                            ping_status = os.system(cmd)
                         # print(ping_status)
+                        # print(self.recieved_server_timestamps.get_dict())
+                        # print(self.connected_servers.get_dict())
+                        
                         if self.connected_servers[i] is True or ping_status == 0:
-                            server_status = stub.Ping(chat_system_pb2.PingMessage(server_id=0 , start_timestamp=self.start_timestamp), timeout=C.PING_TIMEOUT)
+                            server_status = stub.Ping(chat_system_pb2.PingMessage(
+                                server_id=self.id,
+                                start_timestamp=self.start_timestamp,
+                                server_timestamps=self.recieved_server_timestamps.get_dict(),
+                                server_view=self.connected_servers.get_dict()
+                            ), timeout=C.PING_TIMEOUT)
+                            # print(server_status)
                             if server_status.status is True:
                                 if self.connected_servers[i] is False:
                                     ## Get group info from other servers
@@ -157,7 +185,9 @@ class ServerPoolManager:
                             # logging.info(f'ping response {ping_status}')
                             pass
                 except Exception as e:
-                    logging.error(f'failed to connect to {i} {e}')
+                    logging.error(f'failed to connect to {i}')
+                    # logging.error(f'failed to connect to {i} {e}')
+                    # raise e
                     if self.connected_servers[i]:
                         # del self.active_stubs[i]
                         # self.channels[i].close()
@@ -184,7 +214,8 @@ class ServerPoolManager:
         try:
             while True:
                 stub = self.active_stubs.get(server_id)
-                if stub:
+                # logging.info(self.connected_servers[server_id])
+                if stub and self.connected_servers[server_id]:
                     # connected to server
                     # get the participants from new connecctions
                     message_queue = self.message_queues[server_id]
@@ -192,11 +223,13 @@ class ServerPoolManager:
 
                     while True:
                         while message_queue.qsize():
-                            if self.active_stubs.get(server_id) is None:
+                            # logging.info(self.connected_servers[server_id])
+                            if self.active_stubs.get(server_id) is None or not self.connected_servers[server_id]:
                                 # if stub is None, don't wait for new messages
                                 break
                             queue_message = message_queue.queue[0]
                             timestamp, message = queue_message
+                            source_server_id = message['server_id']
                             # print('message', message)
                             server_message = chat_system_pb2.ServerMessage(
                                 group_id=message.get('group_id'),
@@ -209,9 +242,10 @@ class ServerPoolManager:
                                 vector_timestamp =message.get('vector_timestamp'),
                                 event_type=message.get('event_type'),
                                 users=message.get('users'),
-                                server_id=message.get('server_id', self.id),
+                                server_id=message['server_id'],
                                 vector_timestamp_2=message.get('vector_timestamp_2'),
-                                updated_time=message.get('updated_time')
+                                updated_time=message.get('updated_time'),
+                                server_time=message.get('server_time')
                             )
                             try:
                                 status = stub.SyncMessagetoServer(server_message, timeout=0.5)
@@ -220,7 +254,7 @@ class ServerPoolManager:
                                     if timestamp > 0:
                                         self.queue_timestamp_dict[server_id] = timestamp
                                         if timestamp:
-                                            self.file_manager.fast_write(f"{server_id}_last_sent_timestamp", json.dumps(timestamp).encode('utf-8'))
+                                            self.file_manager.fast_write(f"{self.id}/{server_id}_last_sent_timestamp", json.dumps(timestamp).encode('utf-8'))
 
                             except grpc.RpcError as er:
                                 logging.error(f'error sending message to {server_id}')
@@ -230,7 +264,8 @@ class ServerPoolManager:
                             except Exception as e:
                                 logging.error(e)
                                 break
-                        if self.active_stubs.get(server_id) is None:
+                        # logging.info(self.connected_servers[server_id])
+                        if self.active_stubs.get(server_id) is None or not self.connected_servers[server_id]:
                             # if stub is None, don't wait for new messages
                             break
                         message_event.wait()
@@ -243,20 +278,35 @@ class ServerPoolManager:
                 del self.active_stubs[server_id]
         pass
 
-    def send_msg_to_recovered_servers(self, recovered_server_id):
+    def send_msg_to_recovered_servers(self, recovered_server_id, server_view, server_timestamps):
+
+        if server_view:
+            recovered_server_view = self.connected_server_views.get(recovered_server_id)
+            if recovered_server_view:
+                for key, value in server_view.items():
+                    recovered_server_view[key] = value
+        if server_timestamps:
+            recovered_server_received_timestamps = self.ping_server_timestamps.get(recovered_server_id)
+            if recovered_server_received_timestamps:
+                for key, value in server_timestamps.items():
+                    recovered_server_received_timestamps[key] = int(value)
+                    if int(value) > self.recieved_server_timestamps[key] and self.connect_to_servers[key] is False and key != self.id:
+                        self.out_of_sync_servers[key] = True
         self.thread_events[recovered_server_id].set()
+        # if server_view:
+
         pass
 
     def connect_to_servers(self):
         id = self.id
-        num_servers = self.num_servers
+        # num_servers = self.num_servers
         active_stubs = self.active_stubs
         try:
             threading.Thread(target=self.ping_servers, daemon=True).start()
         except Exception as e:
             logging.error(f'Ping servers error: {e}')
         # while len(active_stubs) < num_servers-1:
-        for i in range(1, num_servers + 1):
+        for i in self.server_ids:
             try:
                 if id == i or active_stubs.get(i) is not None: 
                     continue
@@ -283,55 +333,73 @@ class ServerPoolManager:
             return get_timestamp()
         
     def delete_queue_messages(self):
+        sleep(10)
         while True:
-            min_timestamp = min(self.queue_timestamp_dict.values())
-            while self.delete_timestamp_queue.qsize():
-                timestamp = self.delete_timestamp_queue.queue[0]
-                if min_timestamp >= timestamp:
-                    self.file_manager.delete_file(str(timestamp), fast=True)
-                    self.delete_timestamp_queue.get(0)
-                else:
-                    break
+            # min_timestamp = min(self.queue_timestamp_dict.values())
+            for server_id, queue in self.delete_timestamp_queues.items():
+                # print(server_id)
+                # print(self.ping_server_timestamps.keys())
+                # print([(sid, self.ping_server_timestamps[sid].get(server_id, 0)) for sid in self.ping_server_timestamps])
+                min_timestamp = min([self.ping_server_timestamps[sid].get(server_id, 0) for sid in self.ping_server_timestamps if sid != server_id])
+                # print(server_id, min_timestamp)
+                while queue.qsize():
+                    timestamp = queue.queue[0]
+                    if min_timestamp >= timestamp:
+                        self.file_manager.delete_file(f'{server_id}/{timestamp}', fast=True)
+                        queue.get(0)
+                    else:
+                        break
             sleep(C.DELETE_MESSAGE_FROM_DISK_INTERVAL)
 
     def create_message_queues(self):
-        for i in range(1, self.num_servers + 1):
+        for i in self.server_ids:
             if self.id == i:
                 continue
+            self.ping_server_timestamps[i] = ThreadSafeDict()
+            self.connected_server_views[i] = ThreadSafeDict()
             self.thread_events[i] = threading.Event()
             self.message_queues[i] = Queue()
             self.queue_timestamp_dict[i] = 0
             self.connected_servers[i] = False
+            self.recieved_server_timestamps[i] = 0
             
     def load_queue_messages_from_disk(self):
-        queue_msg_files = self.file_manager.list_files(fast=True)
-        queue_msg_files.sort()
+        for sid in self.server_ids:
+            queue_msg_files = self.file_manager.list_files(path=f"{sid}/", fast=True)
+            queue_msg_files.sort()
 
-        for file in queue_msg_files:
-            if file.endswith('_last_sent_timestamp'):
-                lines = self.file_manager.fast_read(file)
-                last_sent_timestamp = json.loads(lines)
-                server_id = int(file.split("_")[0])
-                self.queue_timestamp_dict[server_id] = last_sent_timestamp
-            
-            if file.endswith('_vector_timestamp'):
-                lines = self.file_manager.fast_read(file)
-                data = json.loads(lines)
-                if data:
-                    self.vector_timestamp = data
+            for file in queue_msg_files:
+                if file.endswith('_last_sent_timestamp'):
+                    lines = self.file_manager.fast_read(f"{sid}/{file}")
+                    last_sent_timestamp = json.loads(lines)
+                    server_id = file.split("_")[0]
+                    self.queue_timestamp_dict[server_id] = int(last_sent_timestamp)
 
-        for file in queue_msg_files:
-            if not file.endswith('_timestamp'):
-                timestamp = int(file)
-                self.delete_timestamp_queue.put(timestamp)
-                message = json.loads(self.file_manager.fast_read(file))
-                queue_object = (timestamp, message)
-                for i in range(1, self.num_servers + 1):
-                    if self.id == i or self.queue_timestamp_dict[i] >= timestamp: 
-                        continue
-                    self.message_queues[i].put(queue_object)
-                    # self.thread_events[i].set()
-                self.delete_timestamp_queue.put(timestamp)
+                if file.endswith('_last_recieved_timestamp'):
+                    lines = self.file_manager.fast_read(f"{sid}/{file}")
+                    last_recieved_timestamp = json.loads(lines)
+                    server_id = file.split("_")[0]
+                    self.recieved_server_timestamps[server_id] = int(last_recieved_timestamp)
+                
+                if file.endswith('_vector_timestamp'):
+                    lines = self.file_manager.fast_read(f"{sid}/{file}")
+                    data = json.loads(lines)
+                    if data:
+                        self.vector_timestamp = data
+                    
+            for file in queue_msg_files:
+                if not file.endswith('_timestamp'):
+                    timestamp = int(file)
+                    self.delete_timestamp_queues[sid].put(timestamp)
+                    if sid == self.id:
+                        message = json.loads(self.file_manager.fast_read(f"{sid}/{file}"))
+                        queue_object = (timestamp, message)
+                        for i in self.server_ids:
+                            if sid == i or self.queue_timestamp_dict[i] >= timestamp: 
+                                continue
+                            self.message_queues[i].put(queue_object)
+                            # self.thread_events[i].set()
+                    # self.delete_timestamp_queues[sid].put(timestamp)
 
     def send_to_server(self, message, target_server_id, event_type):
         if target_server_id == self.id:
@@ -349,18 +417,38 @@ class ServerPoolManager:
             message['server_id'] = self.id
         if 'event_type' not in message:
             message['event_type'] = event_type
+        if 'creation_time' not in message:
+            message['creation_time'] = get_timestamp()
 
     def send_msg_to_connected_servers(self, message, event_type=C.MESSAGE_EVENT):
-        timestamp = self.get_unique_timestamp()
-        message['event_type'] = event_type
         self.check_message(message, event_type)
+        timestamp = self.get_unique_timestamp()
+        # message['event_type'] = event_type
+        message['server_time'] = timestamp
+        message['server_id'] = self.id
         queue_object = (timestamp, message)
-        for i in range(1, self.num_servers + 1):
+        for i in self.server_ids:
             # try:
             if self.id == i: 
                 continue
             self.message_queues[i].put(queue_object)
             self.thread_events[i].set()
-        self.delete_timestamp_queue.put(timestamp)
+        self.delete_timestamp_queues.get(self.id).put(timestamp)
         file_name = str(timestamp)
-        self.file_manager.fast_write(file_name, json.dumps(message).encode('utf-8'))
+        self.file_manager.fast_write(f"{self.id}/{file_name}", json.dumps(message).encode('utf-8'))
+
+    def log_message(self, message):
+        
+        server_id = str(message['server_id'])
+        server_time = message['server_time']
+
+        if server_time > self.recieved_server_timestamps[server_id]:
+            self.recieved_server_timestamps[server_id] = server_time
+            self.file_manager.fast_write(f"{self.id}/{server_id}_last_recieved_timestamp", json.dumps(server_time).encode('utf-8'))
+
+        if server_id != str(self.id):
+            q = self.delete_timestamp_queues.get(server_id)
+            if q:
+                self.file_manager.fast_write(f"{server_id}/{server_time}", json.dumps(message).encode('utf-8'))
+                q.put(server_time)
+

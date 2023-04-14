@@ -2,6 +2,7 @@
 import os
 
 NUM_SERVERS = 5
+SERVER_IDS = [str(i) for i in range(1, NUM_SERVERS+1)]
 
 STORE_DATA_ON_FILE_SYSTEM = True
 
