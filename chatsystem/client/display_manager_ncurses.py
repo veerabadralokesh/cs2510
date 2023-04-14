@@ -28,7 +28,13 @@ class DisplayManagerCurses():
 
     def init_messages(self):
         self.group_name = "Chat Client - Team 18"
+        self.participants = ""
         self.message_data = C.INIT_MESSAGES
+        self.INPUT_PROMPT = C.INPUT_PROMPT + ": "
+    
+    def reset(self):
+        self.init_messages()
+        self.resize()
 
     def render_messages(self):
         max_lines = self.message_end_line - 2

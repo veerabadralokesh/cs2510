@@ -77,6 +77,7 @@ def exit_group(user_id, group_id):
     display_manager.info(
         f"{user_id} successfully exited group {group_id}")
     display_manager.write_header(group_name="",participants="")
+    display_manager.reset()
     state[C.ACTIVE_GROUP_KEY] = None
     display_manager.clear()
 
@@ -89,6 +90,7 @@ def logout_user(user_id):
 
         stub.LogoutUser(chat_system_pb2.User(user_id=user_id))
         display_manager.info(f"Logout successful for user_id {user_id}")
+        display_manager.reset()
         state[C.ACTIVE_USER_KEY] = None
 
 
@@ -117,8 +119,8 @@ def close_connection(stub=None, channel=None):
 def health_check_stream():
     while True:
         yield chat_system_pb2.ActiveSession(session_id=state.get(C.SESSION_ID))
-        state['user_joined_event'].wait()
-        state['user_joined_event'].clear()
+        state[C.USER_JOINED_EVENT].wait()
+        state[C.USER_JOINED_EVENT].clear()
         # sleep(C.HEALTH_CHECK_INTERVAL)
     pass
 
@@ -141,10 +143,11 @@ def health_check():
             state[C.SERVER_ONLINE] = False
             state[C.ACTIVE_GROUP_KEY] = None
             state[C.ACTIVE_USER_KEY] = None
+            display_manager.reset()
             display_manager.error('server disconnected')
         # sleep(C.HEALTH_CHECK_INTERVAL)
-        state['user_joined_event'].wait()
-        state['user_joined_event'].clear()
+        state[C.USER_JOINED_EVENT].wait()
+        state[C.USER_JOINED_EVENT].clear()
 
 def cancel_rpc(event, grpc_context):
     event.wait()
@@ -282,7 +285,7 @@ def get_user_connection(stub, user_id):
             display_manager.info(f"Login successful with user_id {user_id}")
             display_manager.set_user(user_id)
             state[C.ACTIVE_USER_KEY] = user_id
-            state['user_joined_event'].set()
+            state[C.USER_JOINED_EVENT].set()
         else:
             raise Exception("Login not successful")
     except grpc.RpcError as rpcError:
@@ -436,7 +439,7 @@ def run():
     
     status = None
     stub = None
-    state['user_joined_event'] = threading.Event()
+    state[C.USER_JOINED_EVENT] = threading.Event()
     health_check_thread = Thread(target=health_check, daemon=True)
     health_check_thread.start()
 

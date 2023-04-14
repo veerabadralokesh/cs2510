@@ -35,7 +35,8 @@ message BlankMessage {}
 message PingMessage {
     int32 server_id = 1;
     int64 start_timestamp = 2;
-    // repeated int32 server_view = 2;
+    map<string, int32> server_timestamps = 3;
+    map<string, string> server_view = 4;
 }
 
 message ActiveSession {
@@ -93,4 +94,5 @@ message ServerMessage {
     string destination_server_id = 12;
     map<string, int32> vector_timestamp_2 = 13;
     uint64 updated_time = 14;
+    uint64 server_time = 15;
 }

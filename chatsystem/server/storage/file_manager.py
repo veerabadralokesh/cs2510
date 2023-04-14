@@ -2,11 +2,16 @@ import os
 import json
 from glob import glob
 
+import server.constants as C
+
 class FileManager:
     def __init__(self, root) -> None:
         self.root = root
         self.fast_root = os.path.join(root, "cache")
         os.makedirs(self.fast_root, exist_ok=True)
+        for i in range(1, C.NUM_SERVERS+1):
+            os.makedirs(os.path.join(self.fast_root, str(i)), exist_ok=True)
+
     
     def write(self, file, message):
         if isinstance(message, dict):
@@ -66,7 +71,11 @@ class FileManager:
         except OSError:
             pass
     
-    def list_files(self, fast=False):
+    def list_files(self, path=None, fast=False):
         if fast:
+            if path:
+                return os.listdir(os.path.join(self.fast_root, path))
             return os.listdir(self.fast_root)
+        if path:
+            return os.listdir(os.path.join(self.root, path))
         return os.listdir(self.root)

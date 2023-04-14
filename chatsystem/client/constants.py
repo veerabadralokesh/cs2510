@@ -10,6 +10,7 @@ ACTIVE_USER_KEY = 'active_user_id'
 ACTIVE_GROUP_KEY = 'active_group_id'
 ACTIVE_CHANNEL = 'channel'
 MESSAGE_START_IDX = 'MESSAGE_START_IDX'
+USER_JOINED_EVENT = 'USER_JOINED_EVENT'
 
 GROUP_DATA = 'group_data'
 

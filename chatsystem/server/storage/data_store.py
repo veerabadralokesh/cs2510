@@ -262,6 +262,8 @@ class Datastore(DataManager):
         
         omvt2 = original_message.get('vector_timestamp_2')
         mvt2 = message.get('vector_timestamp_2')
+        if omvt2 == mvt2:
+            return False
         original_message_before_message = self.compare_vector_timestamps(omvt2, mvt2)
         if original_message_before_message == 0:
             original_message["likes"] = message["likes"]
@@ -389,9 +391,9 @@ class Datastore(DataManager):
 
     def add_user_to_group(self, group_id, user_id, server_id):
         # print("inside add_user_to_group group id", group_id, "users", user_id)
-        print("waiting for group lock")
+        logging.debug("waiting for group lock")
         with self.get_group_lock(group_id):
-            print("acquired group lock")
+            logging.debug("acquired group lock")
             if server_id not in self.groups[group_id]['users']:
                 self.groups[group_id]['users'][server_id] = []
             self.groups[group_id]['users'][server_id].append(user_id)

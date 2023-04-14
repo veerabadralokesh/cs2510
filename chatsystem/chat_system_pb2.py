@@ -13,13 +13,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x63hat_system.proto\x12\nchatsystem\"\x0e\n\x0c\x42lankMessage\"9\n\x0bPingMessage\x12\x11\n\tserver_id\x18\x01 \x01(\x05\x12\x17\n\x0fstart_timestamp\x18\x02 \x01(\x03\"#\n\rActiveSession\x12\x12\n\nsession_id\x18\x01 \x01(\t\"C\n\x06Status\x12\x0e\n\x06status\x18\x01 \x01(\x08\x12\x15\n\rstatusMessage\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\t\"Y\n\x05Group\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x19\n\x11message_start_idx\x18\x03 \x01(\x05\x12\x12\n\nsession_id\x18\x04 \x01(\t\"?\n\x0cGroupDetails\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\r\n\x05users\x18\x02 \x03(\t\x12\x0e\n\x06status\x18\x03 \x01(\x08\"+\n\x04User\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\"\x84\x02\n\x07Message\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x15\n\rcreation_time\x18\x03 \x01(\x04\x12\x0c\n\x04text\x18\x04 \x03(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12-\n\x05likes\x18\x07 \x03(\x0b\x32\x1e.chatsystem.Message.LikesEntry\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12\x1b\n\x13previous_message_id\x18\x08 \x01(\t\x12\r\n\x05users\x18\t \x03(\t\x1a,\n\nLikesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\"\xd7\x04\n\rServerMessage\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x15\n\rcreation_time\x18\x03 \x01(\x04\x12\x0c\n\x04text\x18\x04 \x03(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x33\n\x05likes\x18\x07 \x03(\x0b\x32$.chatsystem.ServerMessage.LikesEntry\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12H\n\x10vector_timestamp\x18\x08 \x03(\x0b\x32..chatsystem.ServerMessage.VectorTimestampEntry\x12\x12\n\nevent_type\x18\t \x01(\t\x12\r\n\x05users\x18\n \x03(\t\x12\x11\n\tserver_id\x18\x0b \x01(\x05\x12\x1d\n\x15\x64\x65stination_server_id\x18\x0c \x01(\t\x12K\n\x12vector_timestamp_2\x18\r \x03(\x0b\x32/.chatsystem.ServerMessage.VectorTimestamp2Entry\x12\x14\n\x0cupdated_time\x18\x0e \x01(\x04\x1a,\n\nLikesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a\x36\n\x14VectorTimestampEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a\x37\n\x15VectorTimestamp2Entry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x32\xdd\x04\n\nChatServer\x12\x31\n\x07GetUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x34\n\nLogoutUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x08GetGroup\x12\x11.chatsystem.Group\x1a\x18.chatsystem.GroupDetails\"\x00\x12\x34\n\tExitGroup\x12\x11.chatsystem.Group\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x0bGetMessages\x12\x11.chatsystem.Group\x1a\x13.chatsystem.Message\"\x00\x30\x01\x12\x38\n\x0bPostMessage\x12\x13.chatsystem.Message\x1a\x12.chatsystem.Status\"\x00\x12\x35\n\x04Ping\x12\x17.chatsystem.PingMessage\x1a\x12.chatsystem.Status\"\x00\x12@\n\x0bHealthCheck\x12\x19.chatsystem.ActiveSession\x1a\x12.chatsystem.Status\"\x00(\x01\x12\x46\n\x13SyncMessagetoServer\x12\x19.chatsystem.ServerMessage\x1a\x12.chatsystem.Status\"\x00\x12?\n\rGetServerView\x12\x18.chatsystem.BlankMessage\x1a\x12.chatsystem.Status\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x63hat_system.proto\x12\nchatsystem\"\x0e\n\x0c\x42lankMessage\"\xad\x02\n\x0bPingMessage\x12\x11\n\tserver_id\x18\x01 \x01(\x05\x12\x17\n\x0fstart_timestamp\x18\x02 \x01(\x03\x12H\n\x11server_timestamps\x18\x03 \x03(\x0b\x32-.chatsystem.PingMessage.ServerTimestampsEntry\x12<\n\x0bserver_view\x18\x04 \x03(\x0b\x32\'.chatsystem.PingMessage.ServerViewEntry\x1a\x37\n\x15ServerTimestampsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a\x31\n\x0fServerViewEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"#\n\rActiveSession\x12\x12\n\nsession_id\x18\x01 \x01(\t\"C\n\x06Status\x12\x0e\n\x06status\x18\x01 \x01(\x08\x12\x15\n\rstatusMessage\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\t\"Y\n\x05Group\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x19\n\x11message_start_idx\x18\x03 \x01(\x05\x12\x12\n\nsession_id\x18\x04 \x01(\t\"?\n\x0cGroupDetails\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\r\n\x05users\x18\x02 \x03(\t\x12\x0e\n\x06status\x18\x03 \x01(\x08\"+\n\x04User\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\"\x84\x02\n\x07Message\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x15\n\rcreation_time\x18\x03 \x01(\x04\x12\x0c\n\x04text\x18\x04 \x03(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12-\n\x05likes\x18\x07 \x03(\x0b\x32\x1e.chatsystem.Message.LikesEntry\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12\x1b\n\x13previous_message_id\x18\x08 \x01(\t\x12\r\n\x05users\x18\t \x03(\t\x1a,\n\nLikesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\"\xec\x04\n\rServerMessage\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x15\n\rcreation_time\x18\x03 \x01(\x04\x12\x0c\n\x04text\x18\x04 \x03(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x33\n\x05likes\x18\x07 \x03(\x0b\x32$.chatsystem.ServerMessage.LikesEntry\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12H\n\x10vector_timestamp\x18\x08 \x03(\x0b\x32..chatsystem.ServerMessage.VectorTimestampEntry\x12\x12\n\nevent_type\x18\t \x01(\t\x12\r\n\x05users\x18\n \x03(\t\x12\x11\n\tserver_id\x18\x0b \x01(\x05\x12\x1d\n\x15\x64\x65stination_server_id\x18\x0c \x01(\t\x12K\n\x12vector_timestamp_2\x18\r \x03(\x0b\x32/.chatsystem.ServerMessage.VectorTimestamp2Entry\x12\x14\n\x0cupdated_time\x18\x0e \x01(\x04\x12\x13\n\x0bserver_time\x18\x0f \x01(\x04\x1a,\n\nLikesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a\x36\n\x14VectorTimestampEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a\x37\n\x15VectorTimestamp2Entry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x32\xdd\x04\n\nChatServer\x12\x31\n\x07GetUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x34\n\nLogoutUser\x12\x10.chatsystem.User\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x08GetGroup\x12\x11.chatsystem.Group\x1a\x18.chatsystem.GroupDetails\"\x00\x12\x34\n\tExitGroup\x12\x11.chatsystem.Group\x1a\x12.chatsystem.Status\"\x00\x12\x39\n\x0bGetMessages\x12\x11.chatsystem.Group\x1a\x13.chatsystem.Message\"\x00\x30\x01\x12\x38\n\x0bPostMessage\x12\x13.chatsystem.Message\x1a\x12.chatsystem.Status\"\x00\x12\x35\n\x04Ping\x12\x17.chatsystem.PingMessage\x1a\x12.chatsystem.Status\"\x00\x12@\n\x0bHealthCheck\x12\x19.chatsystem.ActiveSession\x1a\x12.chatsystem.Status\"\x00(\x01\x12\x46\n\x13SyncMessagetoServer\x12\x19.chatsystem.ServerMessage\x1a\x12.chatsystem.Status\"\x00\x12?\n\rGetServerView\x12\x18.chatsystem.BlankMessage\x1a\x12.chatsystem.Status\"\x00\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'chat_system_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
+  _PINGMESSAGE_SERVERTIMESTAMPSENTRY._options = None
+  _PINGMESSAGE_SERVERTIMESTAMPSENTRY._serialized_options = b'8\001'
+  _PINGMESSAGE_SERVERVIEWENTRY._options = None
+  _PINGMESSAGE_SERVERVIEWENTRY._serialized_options = b'8\001'
   _MESSAGE_LIKESENTRY._options = None
   _MESSAGE_LIKESENTRY._serialized_options = b'8\001'
   _SERVERMESSAGE_LIKESENTRY._options = None
@@ -30,30 +34,34 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _SERVERMESSAGE_VECTORTIMESTAMP2ENTRY._serialized_options = b'8\001'
   _BLANKMESSAGE._serialized_start=33
   _BLANKMESSAGE._serialized_end=47
-  _PINGMESSAGE._serialized_start=49
-  _PINGMESSAGE._serialized_end=106
-  _ACTIVESESSION._serialized_start=108
-  _ACTIVESESSION._serialized_end=143
-  _STATUS._serialized_start=145
-  _STATUS._serialized_end=212
-  _GROUP._serialized_start=214
-  _GROUP._serialized_end=303
-  _GROUPDETAILS._serialized_start=305
-  _GROUPDETAILS._serialized_end=368
-  _USER._serialized_start=370
-  _USER._serialized_end=413
-  _MESSAGE._serialized_start=416
-  _MESSAGE._serialized_end=676
-  _MESSAGE_LIKESENTRY._serialized_start=632
-  _MESSAGE_LIKESENTRY._serialized_end=676
-  _SERVERMESSAGE._serialized_start=679
-  _SERVERMESSAGE._serialized_end=1278
-  _SERVERMESSAGE_LIKESENTRY._serialized_start=632
-  _SERVERMESSAGE_LIKESENTRY._serialized_end=676
-  _SERVERMESSAGE_VECTORTIMESTAMPENTRY._serialized_start=1167
-  _SERVERMESSAGE_VECTORTIMESTAMPENTRY._serialized_end=1221
-  _SERVERMESSAGE_VECTORTIMESTAMP2ENTRY._serialized_start=1223
-  _SERVERMESSAGE_VECTORTIMESTAMP2ENTRY._serialized_end=1278
-  _CHATSERVER._serialized_start=1281
-  _CHATSERVER._serialized_end=1886
+  _PINGMESSAGE._serialized_start=50
+  _PINGMESSAGE._serialized_end=351
+  _PINGMESSAGE_SERVERTIMESTAMPSENTRY._serialized_start=245
+  _PINGMESSAGE_SERVERTIMESTAMPSENTRY._serialized_end=300
+  _PINGMESSAGE_SERVERVIEWENTRY._serialized_start=302
+  _PINGMESSAGE_SERVERVIEWENTRY._serialized_end=351
+  _ACTIVESESSION._serialized_start=353
+  _ACTIVESESSION._serialized_end=388
+  _STATUS._serialized_start=390
+  _STATUS._serialized_end=457
+  _GROUP._serialized_start=459
+  _GROUP._serialized_end=548
+  _GROUPDETAILS._serialized_start=550
+  _GROUPDETAILS._serialized_end=613
+  _USER._serialized_start=615
+  _USER._serialized_end=658
+  _MESSAGE._serialized_start=661
+  _MESSAGE._serialized_end=921
+  _MESSAGE_LIKESENTRY._serialized_start=877
+  _MESSAGE_LIKESENTRY._serialized_end=921
+  _SERVERMESSAGE._serialized_start=924
+  _SERVERMESSAGE._serialized_end=1544
+  _SERVERMESSAGE_LIKESENTRY._serialized_start=877
+  _SERVERMESSAGE_LIKESENTRY._serialized_end=921
+  _SERVERMESSAGE_VECTORTIMESTAMPENTRY._serialized_start=1433
+  _SERVERMESSAGE_VECTORTIMESTAMPENTRY._serialized_end=1487
+  _SERVERMESSAGE_VECTORTIMESTAMP2ENTRY._serialized_start=1489
+  _SERVERMESSAGE_VECTORTIMESTAMP2ENTRY._serialized_end=1544
+  _CHATSERVER._serialized_start=1547
+  _CHATSERVER._serialized_end=2152
 # @@protoc_insertion_point(module_scope)

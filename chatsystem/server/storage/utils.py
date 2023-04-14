@@ -28,6 +28,8 @@ def clean_message(message: dict):
         message['creation_time'] = int(message['creation_time'])
     if 'updated_time' in message:
         message['updated_time'] = int(message['updated_time'])
+    if 'server_time' in message:
+        message['server_time'] = int(message['server_time'])
 
     if "likes" not in message:
         message["likes"] = {}

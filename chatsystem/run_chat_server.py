@@ -24,6 +24,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         self.data_store = data_store
         # self.new_message_event = threading.Event()
         self._lock = threading.Lock()
+        self.timestamp_lock = threading.Lock()
         self.group_message_events = ServerCollection()
         self.spm = spm
         self.file_manager = file_manager
@@ -60,7 +61,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             server_message = {
                 "group_id": group_id,
                 # "users": group.get('users', {}),
-                "creation_time": group.get('creation_time')
+                "creation_time": group.get('creation_time', self.get_timestamp())
             }
             self.spm.send_msg_to_connected_servers(server_message, event_type=C.GROUP_EVENT)
 
@@ -95,7 +96,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
         # logging.info(f"{user_id} joined {group_id}")
         self.new_message({"group_id": group_id, 
         "user_id": user_id,
-        "creation_time": get_timestamp(),
+        "creation_time": self.get_timestamp(),
         "message_id": get_unique_id(),
         "text":[],
         "message_type": C.USER_JOIN})
@@ -192,11 +193,16 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             if group_id:
                 self.get_group_message_event(group_id).set()
 
+    def get_timestamp(self):
+        with self.timestamp_lock:
+            return get_timestamp()
+
     def PostMessage(self, request, context):
         status = chat_system_pb2.Status(status=True, statusMessage = "")
         message = MessageToDict(request, preserving_proto_field_name=True)
         # add vector timestamp to message
         message['server_id'] = self.server_id
+        message['creation_time'] = self.get_timestamp()
         self.new_message(message)
         return status
     
@@ -214,7 +220,7 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                 if group_id is not None:
                     self.new_message({"group_id": group_id, 
                     "user_id": user_id,
-                    "creation_time": get_timestamp(),
+                    "creation_time": self.get_timestamp(),
                     "message_id": get_unique_id(),
                     "text":[],
                     "message_type": C.USER_LEFT})
@@ -264,12 +270,14 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
             # trigger new message event i.e. calling getmessages
             # self.new_message_event.set()
             self.get_group_message_event(group_id).set()
+            # self.spm.log_message(message)
         elif event_type == C.GROUP_EVENT:
             users = message.get('users', {})
             creation_time = message.get('creation_time')
             if not self.data_store.get_group(group_id):
                 # print(f'creating group {group_id}')
                 self.data_store.create_group(group_id, users, creation_time)
+            # self.spm.log_message(message)
         elif event_type == C.GET_GROUP_META_DATA:
             all_groups_data = self.data_store.get_groups_meta_data()
             for group_meta in all_groups_data:
