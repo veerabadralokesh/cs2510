@@ -130,6 +130,8 @@ class Datastore(DataManager):
 
 
     def compare_vector_timestamps(self, timestamp1, timestamp2):
+        # if timestamp1 is None or timestamp2 is None:
+        #     return 0
         comparison_dict = {"less":0, "greater":0, "equal":0}
         for key in timestamp1:
             if timestamp1[key] < timestamp2[key]:
@@ -143,7 +145,7 @@ class Datastore(DataManager):
         if comparison_dict["less"] == 0 and comparison_dict["greater"] > 0:
             return 1 # return (message2, message1) # message2 is older than message1
 
-    def determine_message_order(self, message1, message2, vector_timestamp_key='vector_timestamp', user_server_ids=True):
+    def determine_message_order(self, message1, message2, vector_timestamp_key='vector_timestamp'):
         server1 = message1.get('server_id')
         server2 = message2.get('server_id')
         timestamp1 = message1.get(vector_timestamp_key)
@@ -151,12 +153,19 @@ class Datastore(DataManager):
         timestamp_order = self.compare_vector_timestamps(timestamp1, timestamp2)
         if timestamp_order is not None:
             return timestamp_order
-        if user_server_ids:
-            if server1 < server2:
-                return 0 # return (message1, message2) # message1 is older than message2
+        if server1 < server2:
+            return 0 # return (message1, message2) # message1 is older than message2
+        elif server1 > server2:
             return 1 #(message2, message1) # message2 is older than message1
         else:
-            return -1
+            sv1 = message1.get('server_timestamp')
+            sv2 = message2.get('server_timestamp')
+            if sv1 < sv2:
+                return 0
+            else:
+                return 1
+        # else:
+        #     return -1
 
     def binary_search(self, message_id_list, new_message):
         left = 0
@@ -178,7 +187,7 @@ class Datastore(DataManager):
             self.messages[message_id] = message
             message_ids = self.groups[group_id]["message_ids"]
             ## If new message timestamp is after the last message add it to the end
-            if len(message_ids) == 0 or self.determine_message_order(self.messages[message_ids[-1]], message) == 0:
+            if len(message_ids) == 0 or self.compare_vector_timestamps(self.messages[message_ids[-1]].get('vector_timestamp'), message.get('vector_timestamp')) == 0:
                 self.groups[group_id]["message_ids"].append(message_id)
                 self.groups[group_id]['change_log'].append({
                     "message_id": message_id,
