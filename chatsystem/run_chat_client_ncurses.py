@@ -77,7 +77,7 @@ def exit_group(user_id, group_id):
     display_manager.info(
         f"{user_id} successfully exited group {group_id}")
     display_manager.write_header(group_name="",participants="")
-    display_manager.reset()
+    # display_manager.reset()
     state[C.ACTIVE_GROUP_KEY] = None
     display_manager.clear()
 
