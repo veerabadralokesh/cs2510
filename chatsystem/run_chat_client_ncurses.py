@@ -210,36 +210,60 @@ def get_messages(change_group_event):
                         info_message = f'({datetime.fromtimestamp(int(message.creation_time/10**6))})' + info_message
                     display_manager.info(info_message)
                     continue
-                if message.message_id not in state[C.MESSAGE_ID_TO_NUMBER_MAP]:
-                    state[C.MESSAGE_NUMBER] += 1
-                    # this is to look up display line number of message id
-                    state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id] =  state[C.MESSAGE_NUMBER]
+                
+                message_id = message.message_id
+                previous_msg_id = msg_dict.get('previous_message_id')
 
-                msg_indx = state[C.MESSAGE_ID_TO_NUMBER_MAP][message.message_id]
-
-                if message.message_type in (C.USER_JOIN, C.USER_LEFT):
-                    display_manager.write(msg_indx, f"{message.user_id} {message.message_type} group ({datetime.fromtimestamp(int(message.creation_time/10**6))}).")
-                    update_participants(message, start_timestamp)
+                if previous_msg_id is not None and previous_msg_id not in state[C.MESSAGES]:
                     continue
-                else:
-                    if message.message_id not in state[C.TEXT_ID_TO_NUMBER_MAP]:
-                        state[C.TEXT_MSG_IDX] += 1
-                        # this map is to look up text message id
-                        state[C.MESSAGE_NUMBER_TO_ID_MAP][state[C.TEXT_MSG_IDX]] = message.message_id
-                        state[C.TEXT_ID_TO_NUMBER_MAP][message.message_id] = state[C.TEXT_MSG_IDX]
 
-                if msg_dict.get("likes"):
-                    count = sum(list(map(int, msg_dict.get("likes").values())))
-                else:
-                    count = 0
-                if count > 0:
-                    like_text = f'\t\t\t Likes: {count}'
-                else: 
-                    like_text = ''
-                #  if message_type : 
-                text_idx = state[C.TEXT_ID_TO_NUMBER_MAP][message.message_id]
-                display_manager.write(msg_indx, f"{text_idx}. {message.user_id}: {' '.join(message.text)}{like_text}")
-                state[C.MESSAGES][message.message_id] = msg_dict
+                message_list:list = state[C.MESSAGE_LIST]
+                previous_msg_idx = None
+                
+                if message_id not in state[C.MESSAGES]:
+                    if previous_msg_id is None:
+                        message_list.append(message_id)
+                        #  = f"{text_idx}. {message.user_id}: {' '.join(message.text)}{like_text}"
+                    else:
+                        previous_msg_idx = message_list.index(previous_msg_id)
+                        message_list.insert(previous_msg_idx+1, message_id)
+                state[C.MESSAGES][message_id] = msg_dict
+                
+                if message.message_type in (C.USER_JOIN, C.USER_LEFT):
+                    # display_manager.write(msg_indx, f"{message.user_id} {message.message_type} group ({datetime.fromtimestamp(int(message.creation_time/10**6))}).")
+                    update_participants(message, start_timestamp)
+                    state[C.MESSAGE_DISPLAY_TEXT][message_id] = f"{message.user_id} {message.message_type} group ({datetime.fromtimestamp(int(message.creation_time/10**6))})."
+
+                if message_type not in (C.USER_JOIN, C.USER_LEFT):
+                    if msg_dict.get("likes"):
+                        count = sum(list(map(int, msg_dict.get("likes").values())))
+                    else:
+                        count = 0
+                    if count > 0:
+                        like_text = f'\t\t\t Likes: {count}'
+                    else: 
+                        like_text = ''
+                    # #  if message_type : 
+                    # text_idx = state[C.TEXT_ID_TO_NUMBER_MAP][message.message_id]
+                    state[C.MESSAGE_DISPLAY_TEXT][message_id] = f"{message.user_id}: {' '.join(message.text)}{like_text}"
+
+                display_counter = 1
+                idx_ = 0
+                for msg_id in message_list:
+                    if msg_id in state[C.MESSAGE_DISPLAY_TEXT]:
+                        msg_type = state[C.MESSAGES][msg_id]['message_type']
+                        if msg_type not in (C.USER_JOIN, C.USER_LEFT):
+                            state[C.DISPLAY_MESSAGES][idx_] = f"{display_counter}. {state[C.MESSAGE_DISPLAY_TEXT][msg_id]}"
+                            state[C.MESSAGE_NUMBER_TO_ID_MAP][display_counter] = msg_id
+                            display_counter += 1
+                        else:
+                            state[C.DISPLAY_MESSAGES][idx_] = f"\t\t{state[C.MESSAGE_DISPLAY_TEXT][msg_id]}"
+                        idx_ += 1
+                
+                display_manager.set_message_data(state[C.DISPLAY_MESSAGES])
+                display_manager.write(1, "text")
+
+                
         except grpc.RpcError as rpc_error:
             display_manager.debug(rpc_error)
         except Exception as e:
@@ -319,6 +343,9 @@ def enter_group_chat(stub, group_id, change_group_event):
             state[C.TEXT_MSG_IDX] = 0
             state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
             state[C.MESSAGES] = {}
+            state[C.MESSAGE_LIST] = []
+            state[C.MESSAGE_DISPLAY_TEXT] = {}
+            state[C.DISPLAY_MESSAGES] = {}
             state[C.MESSAGE_START_IDX] = -10
             state[C.ACTIVE_GROUP_KEY] = group_id
         else:
@@ -501,6 +528,9 @@ def run():
                 state[C.TEXT_MSG_IDX] = 0
                 state[C.MESSAGE_NUMBER_TO_ID_MAP] = {}
                 state[C.MESSAGES] = {}
+                state[C.MESSAGE_LIST] = []
+                state[C.DISPLAY_MESSAGES] = {}
+                state[C.MESSAGE_DISPLAY_TEXT] = {}
                 change_group_event.set()
                 display_manager.info('Chat History is printed successfully')
             
@@ -511,6 +541,8 @@ def run():
                 if not message_number.isdigit():
                     raise Exception("Invalid command")
                 message_number = int(message_number)
+                # if message_number not in state[C.MESSAGE_NUMBER_TO_ID_MAP]:
+                #     display_manager.error(f"invalid message number: {message_number}")
                 message_id=state[C.MESSAGE_NUMBER_TO_ID_MAP][message_number]
                 message = state[C.MESSAGES][message_id]
                 if message.get('user_id') == state[C.ACTIVE_USER_KEY]:

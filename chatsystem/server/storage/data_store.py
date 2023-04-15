@@ -348,7 +348,7 @@ class Datastore(DataManager):
                     elif change['type'] == C.CHANGE_LOG_UPDATE:
                         messages_list.append(self.messages.get(change['message_id']))
                     elif change['type'] == C.CHANGE_LOG_INSERT:
-                        message = self.messages.get(change['message_id'])
+                        message = copy.deepcopy(self.messages.get(change['message_id']))
                         message['previous_message_id'] = change['previous_message_id']
                         messages_list.append(message)
                     elif change['type'] == C.CHANGE_LOG_USERS_UPDATE:

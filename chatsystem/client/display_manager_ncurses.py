@@ -55,7 +55,7 @@ class DisplayManagerCurses():
     def write(self, msg_indx, message):
         
         if self.group_name != "" and len(message) > 0:
-            self.message_data[msg_indx] = message
+            # self.message_data[msg_indx] = message
             if self.scrollposition > 0:
                 self.scrollposition = 0
                 self.info(C.NEW_MESSAGE_SCROLL)
@@ -85,11 +85,13 @@ class DisplayManagerCurses():
             self.display_info(info_string)
     
     def warn(self, *args):
+        return
         if len(args) > 0:
             # logging.warn(*args)
             pass
     
     def debug(self, *args):
+        return
         if len(args) > 0:
             # logging.debug(*args)
             pass
