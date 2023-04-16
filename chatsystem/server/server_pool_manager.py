@@ -207,8 +207,8 @@ class ServerPoolManager:
                             # logging.info(f'ping response {ping_status}')
                             pass
                 except Exception as e:
-                    # logging.error(f'failed to connect to {i}')
-                    logging.error(f'failed to connect to {i} {e}')
+                    logging.error(f'failed to connect to {i}')
+                    # logging.error(f'failed to connect to {i} {e}')
                     # raise e
                     if self.connected_servers[i]:
                         # del self.active_stubs[i]
