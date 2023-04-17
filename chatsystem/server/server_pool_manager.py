@@ -132,7 +132,7 @@ class ServerPoolManager:
                 return stub
                 # sleep(C.CONNECT_SERVER_INTERVAL)
         except Exception as e:
-            # print("exception: ", e)
+            # logging.error("exception: ", e)
             pass
 
     def ping_servers(self):
@@ -270,7 +270,7 @@ class ServerPoolManager:
                                 server_time=message.get('server_time')
                             )
                             try:
-                                status = stub.SyncMessagetoServer(server_message, timeout=0.5)
+                                status = stub.SyncMessagetoServer(server_message, timeout=C.MESSAGE_TIMEOUT)
                                 if status.status:
                                     message_queue.get(0)
                                     if timestamp > 0 and source_server_id == self.id:

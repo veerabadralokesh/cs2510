@@ -554,7 +554,10 @@ def run():
             # typing mode & also implement get messages mode
             elif command in C.APPEND_TO_CHAT_COMMANDS:
                 splits = user_input.split(" ")
-                message_number = splits[1]
+                if len(splits) < 2:
+                    display_manager.error("Invalid input for append command")
+                    continue
+                # message_number = splits[1]
                 message_text = " ".join(splits[1:]).strip()
                 post_message(message_text, post_message_queue, post_message_event, None, message_type=C.NEW)
                 display_manager.info('')

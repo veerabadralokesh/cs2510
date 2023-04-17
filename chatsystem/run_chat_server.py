@@ -296,7 +296,8 @@ class ChatServerServicer(chat_system_pb2_grpc.ChatServerServicer):
                 self.spm.send_to_server(group_meta, target_server_id=incoming_server_id, event_type=C.GROUP_META_DATA)
         elif event_type == C.GROUP_META_DATA:
             group_meta_data = message
-            
+            # source_server_id = message['server_id']
+            # if source_server_id in self.spm.get_connected_servers_view():
             if self.data_store.update_group_meta_data(group_id, group_meta_data, incoming_server_id):
                 self.get_group_message_event(group_id).set()
             self.spm.log_message(message_copy)
